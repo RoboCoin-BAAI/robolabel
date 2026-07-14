@@ -307,6 +307,13 @@ skills:
     - same_position
     - unknown
   end_frame_definition: 物体停止被转移的第一帧
+  meaning: 物体已被稳定控制后移动到另一位置；只有明显空间移动才标注。
+  example: 右夹爪将杯子从桌面左侧移动到桌面右侧。
+  annotation_note: 不包含抓起和释放；如果包含释放，应拆成 Transfer + Place。
+  allowed_phase_actions:
+  - carry
+  - position
+  - navigate_motion
 - id: pick
   display_name: 抓起
   template: '[subject] pick up [manipulated_object] from [source_anchor], grasp anchor
@@ -360,6 +367,15 @@ skills:
     - surface
     - unknown
   end_frame_definition: 夹取稳定将要移动的第一帧
+  meaning: 接近并抓起物体。
+  example: 左夹爪从桌面右侧区域抓取书本，抓取部位为书本主体，抓取方式为夹取。
+  annotation_note: manipulated_object 写完整物体；grasp_anchor 写抓取部位。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - lift
 - id: place
   display_name: 放置
   template: '[subject] place [manipulated_object] [placement_relation] [destination_anchor]
@@ -395,6 +411,14 @@ skills:
     - hang_on
     - back_to
   end_frame_definition: 夹爪与物体接触关系消失的第一帧
+  meaning: 平稳放下物体，不是扔。
+  example: 右夹爪将杯子放到桌面右侧区域并释放。
+  annotation_note: placement_relation 使用固定枚举；释放动作属于 Place。
+  allowed_phase_actions:
+  - position
+  - lower
+  - release
+  - retreat
 - id: press
   display_name: 按压
   template: '[subject] press [press_anchor] of [interaction_target] at [position_anchor]
@@ -443,6 +467,14 @@ skills:
     - surface
     - unknown
   end_frame_definition: 目标被稳定按下之后将要释放或状态变化生效的第一帧
+  meaning: 按按钮、开关、可按压部件。
+  example: 右夹爪在面板右侧按压按钮顶部。
+  annotation_note: press_anchor 是被按压部位；interaction_target 是整体对象。
+  allowed_phase_actions:
+  - approach
+  - align
+  - press_motion
+  - retreat
 - id: push
   display_name: 推动
   template: '[subject] push [interaction_target] at [push_anchor] from [source_anchor]
@@ -499,6 +531,14 @@ skills:
     - surface
     - unknown
   end_frame_definition: 施加推力结束的第一帧
+  meaning: 推动物体、把手、门、抽屉等。
+  example: 右夹爪推动抽屉把手，使抽屉向内关闭。
+  annotation_note: 不要求抓住；强调受力方向上的位移。
+  allowed_phase_actions:
+  - approach
+  - align
+  - push_motion
+  - retreat
 - id: pull
   display_name: 拉动
   template: '[subject] pull [interaction_target] at [pull_anchor] from [source_anchor]
@@ -555,6 +595,16 @@ skills:
     - surface
     - unknown
   end_frame_definition: 拉力结束的第一帧
+  meaning: 拉动物体，如抽屉、门、拉链、窗帘。
+  example: 右夹爪拉动窗帘边缘，将窗帘从左侧拉到右侧。
+  annotation_note: 可包含短暂抓住，但核心是拉动目标。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - pull_motion
+  - retreat
 - id: twist
   display_name: 旋转
   template: '[subject] twist [interaction_target] at [twist_anchor] [rotation_direction]
@@ -589,6 +639,16 @@ skills:
     - surface
     - unknown
   end_frame_definition: 目标旋转结束的第一帧
+  meaning: 旋转、拧动、转开关、拧盖子。
+  example: 右夹爪顺时针拧动瓶盖。
+  annotation_note: rotation_direction 固定为 clockwise / counterclockwise。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - rotate_motion
+  - retreat
 - id: pour
   display_name: 倾倒
   template: '[subject] pour [substance] from [source_container] into [destination_container]
@@ -611,6 +671,14 @@ skills:
     - mixed_contents
     - unknown
   end_frame_definition: 倾倒结束的第一帧
+  meaning: 倾倒液体、颗粒、粉末。
+  example: 右夹爪握持水壶，将水从水壶倒入杯子。
+  annotation_note: manipulated_object 是被机器人直接控制的容器；substance 是内容物类型。
+  allowed_phase_actions:
+  - position
+  - tilt_motion
+  - pour_motion
+  - retreat
 - id: fold
   display_name: 折叠
   template: '[subject] fold [folded_part_anchor] of [manipulated_object] and affect
@@ -640,6 +708,18 @@ skills:
     - surface
     - unknown
   end_frame_definition: 折叠步骤完成的第一帧
+  meaning: 折叠布料、纸张、软物体。
+  example: 双手将毛巾的一侧向内折叠。
+  annotation_note: 适合布料、纸张、衣物；folded_part_anchor 是被折叠部位。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - fold_motion
+  - position
+  - release
+  - retreat
 - id: slide
   display_name: 滑动
   template: '[subject] slide [manipulated_object] on [support_surface] from [source_anchor]
@@ -678,6 +758,14 @@ skills:
     - same_position
     - unknown
   end_frame_definition: 物体结束滑行力供给的第一帧
+  meaning: 不拿起，沿表面滑动。
+  example: 右夹爪将盘子沿桌面从左侧滑到右侧。
+  annotation_note: 与 Transfer 区别：物体始终接触支撑面。
+  allowed_phase_actions:
+  - approach
+  - align
+  - slide_motion
+  - retreat
 - id: insert
   display_name: 插入
   template: '[subject] insert [manipulated_object] into [destination_anchor] through
@@ -721,6 +809,15 @@ skills:
     - surface
     - unknown
   end_frame_definition: 机器人完成插入稳定的第一帧
+  meaning: 插入孔、槽、接口、容器开口。
+  example: 右夹爪将积木插入盒子凹槽。
+  annotation_note: insert_anchor 是入口/孔/槽；destination_anchor 是插入后的目标位置。
+  allowed_phase_actions:
+  - position
+  - align
+  - insert_motion
+  - release
+  - retreat
 - id: shake
   display_name: 摇晃
   template: '[subject] shake [manipulated_object] at [position_anchor] and affect
@@ -750,6 +847,12 @@ skills:
     - surface
     - unknown
   end_frame_definition: 摇晃结束的第一帧
+  meaning: 摇晃物体，使内部物质混合、散开或掉落。
+  example: 右夹爪摇晃瓶子，使瓶内液体混合。
+  annotation_note: 通常要求物体已被稳定抓住；不包含 Pick。
+  allowed_phase_actions:
+  - secure
+  - shake_motion
 - id: strike
   display_name: 敲击
   template: '[subject] strike [interaction_target] at [strike_anchor] and affect [changed_object]'
@@ -778,6 +881,14 @@ skills:
     - surface
     - unknown
   end_frame_definition: 工具/末端与目标发生有效撞击的帧之后工具将要离开的第一帧
+  meaning: 敲击、打击、盖章、拍打。
+  example: 右夹爪敲击白纸，使纸上出现印记。
+  annotation_note: 当前模板不单独填写工具或末端；用 subject 表示执行主体。
+  allowed_phase_actions:
+  - approach
+  - align
+  - strike_motion
+  - retreat
 - id: throw
   display_name: 抛出
   template: '[subject] throw [manipulated_object] toward [destination_anchor] and
@@ -801,6 +912,13 @@ skills:
     - same_position
     - unknown
   end_frame_definition: 物体离开夹爪的第一帧
+  meaning: 运动中释放、抛出或突然丢下。
+  example: 右夹爪将纸团扔进垃圾桶。
+  annotation_note: 与 Place 区别：释放时物体仍有明显运动速度。
+  allowed_phase_actions:
+  - carry
+  - throw_motion
+  - release
 - id: navigate
   display_name: 移动/导航
   template: '[subject] move from [source_anchor] to [destination_anchor]'
@@ -835,6 +953,11 @@ skills:
     - same_position
     - unknown
   end_frame_definition: 机器人停止施加移动力的第一帧
+  meaning: 机器人本体/底盘移动，不操作物体。
+  example: 机器人本体从桌子前方移动到窗帘前方。
+  annotation_note: subject 通常是 robot_body / base；不涉及 manipulated_object。
+  allowed_phase_actions:
+  - navigate_motion
 - id: wipe_scrub
   display_name: 擦拭/刷洗
   template: '[subject] scrub/wipe [interaction_target] with [tool] at [position_anchor]
@@ -866,6 +989,14 @@ skills:
     - surface
     - unknown
   end_frame_definition: 擦洗结束的第一帧
+  meaning: 用工具或末端擦拭、刷洗。
+  example: 右夹爪使用马桶刷刷洗马桶内壁。
+  annotation_note: tool 可以是刷子、抹布、海绵，也可以自定义填写。
+  allowed_phase_actions:
+  - approach
+  - align
+  - scrub_motion
+  - retreat
 - id: none
   display_name: 无任务相关操作
   template: '[subject] performs no task-relevant manipulation'
@@ -874,6 +1005,12 @@ skills:
   - subject
   enum_constraints: {}
   end_frame_definition: 无任务相关操作结束，或视频结束的第一帧
+  meaning: 无任务相关操作。
+  example: 机器人短暂停止或画面中没有任务相关动作。
+  annotation_note: 用于最终结束或开始写 none 的区间。
+  allowed_phase_actions:
+  - idle
+  - retreat
 - id: manipulate
   display_name: 其他操作
   template: '[subject] manipulate [interaction_target] at [position_anchor] and affect
@@ -903,6 +1040,34 @@ skills:
     - surface
     - unknown
   end_frame_definition: 人工指定关键状态变化帧
+  meaning: 其他未覆盖操作。
+  example: 右夹爪调整未知物体位置。
+  annotation_note: 只能兜底；高频动作应单独新增 skill。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - lift
+  - carry
+  - position
+  - lower
+  - release
+  - press_motion
+  - push_motion
+  - pull_motion
+  - rotate_motion
+  - tilt_motion
+  - pour_motion
+  - fold_motion
+  - slide_motion
+  - insert_motion
+  - shake_motion
+  - strike_motion
+  - throw_motion
+  - scrub_motion
+  - navigate_motion
+  - retreat
 - id: custom
   display_name: 自定义片段技能
   template: '[description]'
@@ -911,3 +1076,32 @@ skills:
   - description
   enum_constraints: {}
   end_frame_definition: 人工指定自定义片段结束帧
+  meaning: 自定义语义片段技能。
+  example: 用自然语言描述当前片段技能。
+  annotation_note: 当已有 skill 都不合适时使用；phase action 不做额外限制。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - lift
+  - carry
+  - position
+  - lower
+  - release
+  - press_motion
+  - push_motion
+  - pull_motion
+  - rotate_motion
+  - tilt_motion
+  - pour_motion
+  - fold_motion
+  - slide_motion
+  - insert_motion
+  - shake_motion
+  - strike_motion
+  - throw_motion
+  - scrub_motion
+  - navigate_motion
+  - retreat
+  - idle

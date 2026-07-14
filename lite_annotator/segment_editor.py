@@ -20,11 +20,13 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from common.skill_schema import load_skill_templates
 from lite_annotator.ui_text import bilingual_label
 from lite_annotator.vocabulary import option_label
 from lite_annotator.skill_library import skill_display_text
 
 PHASE_ACTIONS_PATH = Path(__file__).resolve().parents[1] / "config" / "phase_actions.json"
+_, SKILL_TEMPLATES = load_skill_templates()
 
 
 def load_phase_actions(path=PHASE_ACTIONS_PATH):
@@ -37,10 +39,19 @@ def load_phase_actions(path=PHASE_ACTIONS_PATH):
 
 
 class PhaseDialog(QDialog):
-    def __init__(self, frame_count=0, current_frame=0, object_options=None, phases=None, parent=None):
+    def __init__(
+        self,
+        frame_count=0,
+        current_frame=0,
+        object_options=None,
+        phases=None,
+        allowed_actions=None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.setWindowTitle(bilingual_label("phase标注", "phase annotation"))
         self.phases = list(phases or [])
+        self.allowed_actions = set(allowed_actions or [])
         max_frame = max(int(frame_count) - 1, 0)
         current_frame = max(0, min(int(current_frame), max_frame))
 
@@ -54,6 +65,8 @@ class PhaseDialog(QDialog):
         self.end_frame_input.setValue(current_frame)
         self.action_select = QComboBox()
         for value, label in load_phase_actions():
+            if self.allowed_actions and value not in self.allowed_actions:
+                continue
             self.action_select.addItem(f"{label}({value})", value)
         self.object_select = QComboBox()
         for value, label in (object_options or {}).items():
@@ -284,6 +297,17 @@ class SegmentEditor(QWidget):
             "text": template.get("text", ""),
         }
 
+    def allowed_phase_actions_for_subtask(self, subtask):
+        allowed = []
+        for action in (subtask or {}).get("actions") or []:
+            if not isinstance(action, dict):
+                continue
+            skill = SKILL_TEMPLATES.get(action.get("skill")) or {}
+            for phase_action in skill.get("allowed_phase_actions") or []:
+                if phase_action not in allowed:
+                    allowed.append(phase_action)
+        return allowed
+
     def add_subtask_from_inputs(self):
         subtask = self.build_subtask_from_inputs()
         if subtask is None:
@@ -340,6 +364,7 @@ class SegmentEditor(QWidget):
             current_frame=self.current_frame,
             object_options=self.scene_object_options,
             phases=subtask.get("phases") or [],
+            allowed_actions=self.allowed_phase_actions_for_subtask(subtask),
             parent=self,
         )
         if dialog.exec_() != QDialog.Accepted:

@@ -53,6 +53,9 @@ class SkillForm(QWidget):
             )
         self.skill_select.currentIndexChanged.connect(self.render_slots)
 
+        self.skill_info = QTextEdit()
+        self.skill_info.setReadOnly(True)
+        self.skill_info.setMaximumHeight(150)
         self.form_layout = QFormLayout()
         self.preview = QTextEdit()
         self.preview.setReadOnly(True)
@@ -60,6 +63,7 @@ class SkillForm(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.skill_select)
+        layout.addWidget(self.skill_info)
         layout.addLayout(self.form_layout)
         layout.addWidget(self.preview)
         self.render_slots()
@@ -76,12 +80,28 @@ class SkillForm(QWidget):
 
         self.slot_widgets = {}
         skill = SKILL_TEMPLATES[self.current_skill_id()]
+        self.render_skill_info(skill)
         for slot in skill["required_slots"]:
             editor = self.create_slot_editor(skill, slot)
             self.slot_widgets[slot] = editor
             label = bilingual_label(skill.get("slot_display_names", {}).get(slot, slot), slot)
             self.form_layout.addRow(label, editor)
         self.update_preview()
+
+    def render_skill_info(self, skill):
+        lines = []
+        if skill.get("meaning"):
+            lines.append(f"含义: {skill['meaning']}")
+        if skill.get("example"):
+            lines.append(f"例子: {skill['example']}")
+        if skill.get("annotation_note"):
+            lines.append(f"补充: {skill['annotation_note']}")
+        if skill.get("end_frame_definition"):
+            lines.append(f"结束边界: {skill['end_frame_definition']}")
+        allowed_phase_actions = skill.get("allowed_phase_actions") or []
+        if allowed_phase_actions:
+            lines.append(f"允许phase action: {', '.join(allowed_phase_actions)}")
+        self.skill_info.setText("\n".join(lines))
 
     def create_slot_editor(self, skill, slot):
         if slot in OBJECT_SLOT_KEYS and self.scene_object_options:

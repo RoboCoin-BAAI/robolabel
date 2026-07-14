@@ -694,6 +694,12 @@ def validate_subtask(subtask, skill_templates, coordination_modes, prefix="subta
     phases = subtask.get("phases") or []
     if not isinstance(phases, list):
         return f"{prefix}.phases 必须是 list"
+    allowed_phase_actions = []
+    for action in actions:
+        skill_config = skill_templates.get(action.get("skill")) or {}
+        for phase_action in skill_config.get("allowed_phase_actions") or []:
+            if phase_action not in allowed_phase_actions:
+                allowed_phase_actions.append(phase_action)
     previous_phase_end = start_frame - 1
     for phase_idx, phase in enumerate(phases):
         phase_prefix = f"{prefix}.phases[{phase_idx}]"
@@ -723,6 +729,11 @@ def validate_subtask(subtask, skill_templates, coordination_modes, prefix="subta
         previous_phase_end = phase_end
         if phase.get("action") not in PHASE_ACTION_ALLOWED_VALUES:
             return f"{phase_prefix} action 必须属于 {sorted(PHASE_ACTION_ALLOWED_VALUES)}"
+        if allowed_phase_actions and phase.get("action") not in allowed_phase_actions:
+            return (
+                f"{phase_prefix} action 不符合当前片段技能允许范围: "
+                f"{allowed_phase_actions}"
+            )
         if not str(phase.get("object", "")).strip():
             return f"{phase_prefix} object 不能为空"
     if phases and previous_phase_end != end_frame:
