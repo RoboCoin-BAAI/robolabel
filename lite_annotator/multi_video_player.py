@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
 )
 
 from lite_annotator.ui_text import bilingual_label
+from lite_annotator.ui_theme import scaled
 from lite_annotator.vocabulary import option_label
 
 
@@ -61,7 +62,7 @@ class MultiCameraVideoPlayer(QWidget):
         self.info_label.setWordWrap(True)
         self.info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.info_panel = QWidget()
-        self.info_panel.setFixedWidth(self.MAIN_FRAME_SIZE[0])
+        self.info_panel.setFixedWidth(self.scaled_main_frame_size()[0])
         self.info_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.info_panel.setStyleSheet(
             "background-color: #f9fbfb; border: 1px solid #c6d0d5; border-radius: 6px;"
@@ -93,7 +94,7 @@ class MultiCameraVideoPlayer(QWidget):
         self.clear_grid()
         label = QLabel(bilingual_label("未加载数据条目", "no episode loaded"))
         label.setAlignment(Qt.AlignCenter)
-        label.setMinimumSize(640, 360)
+        label.setMinimumSize(*self.scaled_main_frame_size())
         self.video_grid.addWidget(label, 0, 0)
         self.camera_labels = {"__placeholder__": label}
         self.set_current_subtask(None)
@@ -144,13 +145,14 @@ class MultiCameraVideoPlayer(QWidget):
         self.clear_grid()
         self.camera_labels = {}
         self.camera_containers = {}
+        self.info_panel.setFixedWidth(self.scaled_main_frame_size()[0])
         for column in range(2):
             self.video_grid.setColumnStretch(column, 0)
         for row in range(2):
             self.video_grid.setRowStretch(row, 0)
         for index, camera in enumerate(self.ordered_cameras()):
             is_main = index == 0
-            frame_size = self.MAIN_FRAME_SIZE if is_main else self.AUX_FRAME_SIZE
+            frame_size = self.scaled_main_frame_size() if is_main else self.scaled_aux_frame_size()
             container = QWidget()
             container.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             layout = QVBoxLayout(container)
@@ -159,7 +161,7 @@ class MultiCameraVideoPlayer(QWidget):
             title = QLabel(camera)
             title.setAlignment(Qt.AlignCenter)
             title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            title.setFixedHeight(self.TITLE_HEIGHT)
+            title.setFixedHeight(scaled(self.TITLE_HEIGHT))
             image = QLabel()
             image.setAlignment(Qt.AlignCenter)
             image.setFixedSize(*frame_size)
@@ -173,6 +175,12 @@ class MultiCameraVideoPlayer(QWidget):
                 self.video_grid.addWidget(container, 1, index - 1, Qt.AlignHCenter | Qt.AlignTop)
             self.camera_labels[camera] = image
             self.camera_containers[camera] = container
+
+    def scaled_main_frame_size(self) -> tuple[int, int]:
+        return scaled(self.MAIN_FRAME_SIZE[0]), scaled(self.MAIN_FRAME_SIZE[1])
+
+    def scaled_aux_frame_size(self) -> tuple[int, int]:
+        return scaled(self.AUX_FRAME_SIZE[0]), scaled(self.AUX_FRAME_SIZE[1])
 
     def ordered_cameras(self) -> list[str]:
         cameras = list(self.frames_by_camera)
