@@ -13,6 +13,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from lite_annotator.video_decode import decode_video_frames
+
 
 class VideoPlayer(QWidget):
     frame_changed = pyqtSignal(int)
@@ -56,17 +58,7 @@ class VideoPlayer(QWidget):
         return len(self.frames)
 
     def load_video(self, path: str | Path) -> None:
-        import cv2
-
-        capture = cv2.VideoCapture(str(path))
-        frames = []
-        success, frame = capture.read()
-        while success:
-            frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            success, frame = capture.read()
-        capture.release()
-        if not frames:
-            raise RuntimeError(f"Could not decode video: {path}")
+        frames = decode_video_frames(path)
 
         self.timer.stop()
         self.play_button.setText("Play")

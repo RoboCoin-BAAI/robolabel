@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (
 
 from lite_annotator.ui_text import bilingual_label
 from lite_annotator.ui_theme import scaled
+from lite_annotator.video_decode import decode_video_frames
 from lite_annotator.vocabulary import option_label
 
 
@@ -112,20 +113,9 @@ class MultiCameraVideoPlayer(QWidget):
         if len(camera_videos) > 3:
             raise RuntimeError("最多选择 3 个相机")
 
-        import cv2
-
         loaded: dict[str, list] = {}
         for camera, video_path in camera_videos.items():
-            capture = cv2.VideoCapture(str(video_path))
-            frames = []
-            success, frame = capture.read()
-            while success:
-                frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                success, frame = capture.read()
-            capture.release()
-            if not frames:
-                raise RuntimeError(f"Could not decode video: {video_path}")
-            loaded[camera] = frames
+            loaded[camera] = decode_video_frames(video_path)
 
         self.timer.stop()
         self.play_button.setText(bilingual_label("播放", "play"))
