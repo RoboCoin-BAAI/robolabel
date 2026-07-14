@@ -1,0 +1,913 @@
+template_set_version: skill_templates_v1
+slot_display_names:
+  subject: 执行主体
+  manipulated_object: 被操作物体
+  source_anchor: 起始位置
+  destination_anchor: 目标位置
+  grasp_anchor: 抓取部位
+  grasp_method: 抓取方式
+  placement_relation: 放置关系
+  press_anchor: 按压部位
+  interaction_target: 交互目标
+  position_anchor: 位置
+  changed_object: 变化对象
+  push_anchor: 推动部位
+  pull_anchor: 拉动部位
+  twist_anchor: 旋转部位
+  rotation_direction: 旋转方向
+  substance: 倾倒物
+  source_container: 源容器
+  destination_container: 目标容器
+  fold_anchor: 折叠部位
+  folded_part_anchor: 被折叠部位
+  support_surface: 支撑表面
+  insert_anchor: 插入口
+  strike_anchor: 敲击部位
+  tool: 工具
+  description: 语义描述
+enum_constraints:
+  subject:
+  - left_effector
+  - right_effector
+  - both_effectors
+  - base
+  - robot_body
+  - left_arm
+  - right_arm
+  - both_arms
+  - unknown
+enum_display_names:
+  subject:
+    left_effector: 左末端
+    right_effector: 右末端
+    both_effectors: 双末端
+    base: 底盘
+    robot_body: 机器人本体
+    left_arm: 左机械臂
+    right_arm: 右机械臂
+    both_arms: 双臂
+    unknown: 无法判断
+  source_anchor:
+    left: 左
+    right: 右
+    up: 上
+    down: 下
+    front: 前
+    back: 后
+    center: 中间
+    near: 附近
+    far: 远处
+    same_position: 原位
+    unknown: 无法判断
+  destination_anchor:
+    left: 左
+    right: 右
+    up: 上
+    down: 下
+    front: 前
+    back: 后
+    center: 中间
+    near: 附近
+    far: 远处
+    same_position: 原位
+    unknown: 无法判断
+  placement_relation:
+    'on': 在...上
+    in: 在...里
+    into: 放入/进入
+    under: 在...下
+    beside: 在...旁边
+    near: 靠近
+    against: 贴靠/抵住
+    hang_on: 挂在...上
+    back_to: 背靠/靠回
+  rotation_direction:
+    clockwise: 顺时针
+    counterclockwise: 逆时针
+  grasp_method:
+    pinch: 指尖/夹爪尖端夹取
+    clamp: 两侧夹紧物体主体
+    hook: 勾住边缘/把手/孔洞
+    support: 从下方托起/承托
+    wrap: 多指/整手包裹式抓取
+    cage: 限制物体逃逸
+    suction: 吸附抓取
+    magnetic: 磁吸抓取
+    unknown: 无法判断
+  object_part_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+  substance:
+    liquid: 液体
+    granules: 颗粒
+    powder: 粉末
+    solid_items: 固体内容物
+    mixed_contents: 混合内容物
+    unknown: 无法判断
+  insert_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+  pull_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+  folded_part_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+  position_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+  grasp_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+  strike_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+  push_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+  press_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+  twist_anchor:
+    main_body: 主要部位
+    top: 顶部
+    bottom: 底部
+    front: 前部
+    back: 后部
+    left_side: 左侧
+    right_side: 右侧
+    center: 中心
+    edge: 边缘
+    corner: 角部
+    handle: 手柄
+    opening: 开口
+    tip: 尖端
+    tail: 尾部
+    surface: 表面
+    unknown: 无法判断
+skills:
+- id: transfer
+  display_name: 拿着物体移动
+  template: '[subject] transfer [manipulated_object] from [source_anchor] to [destination_anchor]'
+  ui_template: '[subject] 拿着 [manipulated_object] 从 [source_anchor] 移动到 [destination_anchor]'
+  required_slots:
+  - subject
+  - manipulated_object
+  - source_anchor
+  - destination_anchor
+  enum_constraints:
+    source_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+  end_frame_definition: 物体停止被转移的第一帧
+- id: pick
+  display_name: 抓起
+  template: '[subject] pick up [manipulated_object] from [source_anchor], grasp anchor
+    [grasp_anchor], grasp method [grasp_method]'
+  ui_template: '[subject] 从 [source_anchor] 抓起 [manipulated_object]，抓取部位 [grasp_anchor]，抓取方式
+    [grasp_method]'
+  required_slots:
+  - subject
+  - manipulated_object
+  - source_anchor
+  - grasp_anchor
+  - grasp_method
+  enum_constraints:
+    source_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    grasp_method:
+    - pinch
+    - clamp
+    - hook
+    - support
+    - wrap
+    - cage
+    - suction
+    - magnetic
+    - unknown
+    grasp_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 夹取稳定将要移动的第一帧
+- id: place
+  display_name: 放置
+  template: '[subject] place [manipulated_object] [placement_relation] [destination_anchor]
+    and release it'
+  ui_template: '[subject] 将 [manipulated_object] 以 [placement_relation] 的关系放到 [destination_anchor]
+    并释放'
+  required_slots:
+  - subject
+  - manipulated_object
+  - placement_relation
+  - destination_anchor
+  enum_constraints:
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    placement_relation:
+    - 'on'
+    - in
+    - into
+    - under
+    - beside
+    - near
+    - against
+    - hang_on
+    - back_to
+  end_frame_definition: 夹爪与物体接触关系消失的第一帧
+- id: press
+  display_name: 按压
+  template: '[subject] press [press_anchor] of [interaction_target] at [position_anchor]
+    and affect [changed_object]'
+  ui_template: '[subject] 在 [position_anchor] 按压 [interaction_target] 的 [press_anchor]，作用于
+    [changed_object]'
+  required_slots:
+  - subject
+  - press_anchor
+  - interaction_target
+  - position_anchor
+  - changed_object
+  enum_constraints:
+    position_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+    press_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 目标被稳定按下之后将要释放或状态变化生效的第一帧
+- id: push
+  display_name: 推动
+  template: '[subject] push [interaction_target] at [push_anchor] from [source_anchor]
+    to/toward [destination_anchor] and affect [changed_object]'
+  ui_template: '[subject] 在 [push_anchor] 推动 [interaction_target]，从 [source_anchor]
+    到/朝向 [destination_anchor]，作用于 [changed_object]'
+  required_slots:
+  - subject
+  - interaction_target
+  - push_anchor
+  - source_anchor
+  - destination_anchor
+  - changed_object
+  enum_constraints:
+    source_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    push_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 施加推力结束的第一帧
+- id: pull
+  display_name: 拉动
+  template: '[subject] pull [interaction_target] at [pull_anchor] from [source_anchor]
+    to/toward [destination_anchor] and affect [changed_object]'
+  ui_template: '[subject] 在 [pull_anchor] 拉动 [interaction_target]，从 [source_anchor]
+    到/朝向 [destination_anchor]，作用于 [changed_object]'
+  required_slots:
+  - subject
+  - interaction_target
+  - pull_anchor
+  - source_anchor
+  - destination_anchor
+  - changed_object
+  enum_constraints:
+    source_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    pull_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 拉力结束的第一帧
+- id: twist
+  display_name: 旋转
+  template: '[subject] twist [interaction_target] at [twist_anchor] [rotation_direction]
+    and affect [changed_object]'
+  ui_template: '[subject] 在 [twist_anchor] 以 [rotation_direction] 方向旋转 [interaction_target]，作用于
+    [changed_object]'
+  required_slots:
+  - subject
+  - interaction_target
+  - twist_anchor
+  - rotation_direction
+  - changed_object
+  enum_constraints:
+    rotation_direction:
+    - clockwise
+    - counterclockwise
+    twist_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 目标旋转结束的第一帧
+- id: pour
+  display_name: 倾倒
+  template: '[subject] pour [substance] from [source_container] into [destination_container]
+    by manipulating [manipulated_object] and affect [changed_object]'
+  ui_template: '[subject] 操作 [manipulated_object]，将 [substance] 从 [source_container]
+    倒入 [destination_container]，作用于 [changed_object]'
+  required_slots:
+  - subject
+  - substance
+  - source_container
+  - destination_container
+  - manipulated_object
+  - changed_object
+  enum_constraints:
+    substance:
+    - liquid
+    - granules
+    - powder
+    - solid_items
+    - mixed_contents
+    - unknown
+  end_frame_definition: 倾倒结束的第一帧
+- id: fold
+  display_name: 折叠
+  template: '[subject] fold [folded_part_anchor] of [manipulated_object] and affect
+    [changed_object]'
+  ui_template: '[subject] 折叠 [manipulated_object] 的 [folded_part_anchor]，作用于 [changed_object]'
+  required_slots:
+  - subject
+  - manipulated_object
+  - folded_part_anchor
+  - changed_object
+  enum_constraints:
+    folded_part_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 折叠步骤完成的第一帧
+- id: slide
+  display_name: 滑动
+  template: '[subject] slide [manipulated_object] on [support_surface] from [source_anchor]
+    to [destination_anchor]'
+  ui_template: '[subject] 让 [manipulated_object] 在 [support_surface] 上从 [source_anchor]
+    滑动到 [destination_anchor]'
+  required_slots:
+  - subject
+  - manipulated_object
+  - support_surface
+  - source_anchor
+  - destination_anchor
+  enum_constraints:
+    source_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+  end_frame_definition: 物体结束滑行力供给的第一帧
+- id: insert
+  display_name: 插入
+  template: '[subject] insert [manipulated_object] into [destination_anchor] through
+    [insert_anchor] and affect [changed_object]'
+  ui_template: '[subject] 将 [manipulated_object] 通过 [insert_anchor] 插入 [destination_anchor]，作用于
+    [changed_object]'
+  required_slots:
+  - subject
+  - manipulated_object
+  - destination_anchor
+  - insert_anchor
+  - changed_object
+  enum_constraints:
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    insert_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 机器人完成插入稳定的第一帧
+- id: shake
+  display_name: 摇晃
+  template: '[subject] shake [manipulated_object] at [position_anchor] and affect
+    [changed_object]'
+  ui_template: '[subject] 在 [position_anchor] 摇晃 [manipulated_object]，作用于 [changed_object]'
+  required_slots:
+  - subject
+  - manipulated_object
+  - position_anchor
+  - changed_object
+  enum_constraints:
+    position_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 摇晃结束的第一帧
+- id: strike
+  display_name: 敲击
+  template: '[subject] strike [interaction_target] at [strike_anchor] and affect [changed_object]'
+  ui_template: '[subject] 敲击 [interaction_target] 的 [strike_anchor]，作用于 [changed_object]'
+  required_slots:
+  - subject
+  - interaction_target
+  - strike_anchor
+  - changed_object
+  enum_constraints:
+    strike_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 工具/末端与目标发生有效撞击的帧之后工具将要离开的第一帧
+- id: throw
+  display_name: 抛出
+  template: '[subject] throw [manipulated_object] toward [destination_anchor] and
+    release it during motion'
+  ui_template: '[subject] 将 [manipulated_object] 朝 [destination_anchor] 抛出，并在运动中释放'
+  required_slots:
+  - subject
+  - manipulated_object
+  - destination_anchor
+  enum_constraints:
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+  end_frame_definition: 物体离开夹爪的第一帧
+- id: navigate
+  display_name: 移动/导航
+  template: '[subject] move from [source_anchor] to [destination_anchor]'
+  ui_template: '[subject] 从 [source_anchor] 移动到 [destination_anchor]'
+  required_slots:
+  - subject
+  - source_anchor
+  - destination_anchor
+  enum_constraints:
+    source_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - unknown
+  end_frame_definition: 机器人停止施加移动力的第一帧
+- id: wipe_scrub
+  display_name: 擦拭/刷洗
+  template: '[subject] scrub/wipe [interaction_target] with [tool] at [position_anchor]
+    and affect [changed_object]'
+  ui_template: '[subject] 在 [position_anchor] 用 [tool] 擦拭/刷洗 [interaction_target]，作用于
+    [changed_object]'
+  required_slots:
+  - subject
+  - interaction_target
+  - tool
+  - position_anchor
+  - changed_object
+  enum_constraints:
+    position_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 擦洗结束的第一帧
+- id: none
+  display_name: 无任务相关操作
+  template: '[subject] performs no task-relevant manipulation'
+  ui_template: '[subject] 无任务相关操作'
+  required_slots:
+  - subject
+  enum_constraints: {}
+  end_frame_definition: 无任务相关操作结束，或视频结束的第一帧
+- id: manipulate
+  display_name: 其他操作
+  template: '[subject] manipulate [interaction_target] at [position_anchor] and affect
+    [changed_object]'
+  ui_template: '[subject] 在 [position_anchor] 操作 [interaction_target]，作用于 [changed_object]'
+  required_slots:
+  - subject
+  - interaction_target
+  - position_anchor
+  - changed_object
+  enum_constraints:
+    position_anchor:
+    - main_body
+    - top
+    - bottom
+    - front
+    - back
+    - left_side
+    - right_side
+    - center
+    - edge
+    - corner
+    - handle
+    - opening
+    - tip
+    - tail
+    - surface
+    - unknown
+  end_frame_definition: 人工指定关键状态变化帧
+- id: custom
+  display_name: 自定义片段技能
+  template: '[description]'
+  ui_template: '[description]'
+  required_slots:
+  - description
+  enum_constraints: {}
+  end_frame_definition: 人工指定自定义片段结束帧
