@@ -15,7 +15,8 @@ DEFAULT_COORDINATION_MODE_PATH = os.path.join(ROOT_DIR, "config", "coordination_
 DEFAULT_SCENE_TEMPLATE_PATH = os.path.join(ROOT_DIR, "config", "scene_templates.yaml")
 
 ACTION_ALLOWED_KEYS = {"subject", "skill", "slots", "text"}
-PHASE_ALLOWED_KEYS = {"start_frame", "end_frame", "action", "object"}
+PHASE_ALLOWED_KEYS = {"start_frame", "end_frame", "action", "object", "target_action"}
+PHASE_REQUIRED_KEYS = {"start_frame", "end_frame", "action", "object"}
 PHASE_ACTION_ALLOWED_VALUES = {
     "approach",
     "align",
@@ -47,15 +48,17 @@ SUBTASK_ALLOWED_KEYS = {
     "start_frame",
     "end_frame",
     "skill_id",
+    "state",
     "coordination_mode",
     "actions",
     "text",
     "phases",
 }
-SUBTASK_REQUIRED_KEYS = SUBTASK_ALLOWED_KEYS - {"phases"}
+SUBTASK_REQUIRED_KEYS = SUBTASK_ALLOWED_KEYS - {"phases", "state"}
 ROBOT_EMBODIMENT_ALLOWED_VALUES = ["single_arm", "dual_arm"]
 ROBOT_SETUP_ALLOWED_KEYS = {
     "embodiment",
+    "base_mobility_type",
     "single_effector_type",
     "left_effector_type",
     "right_effector_type",
@@ -102,9 +105,12 @@ EFFECTOR_TYPE_DISPLAY_NAMES = {
 }
 DEFAULT_ROBOT_SETUP = {
     "embodiment": "dual_arm",
+    "base_mobility_type": "unknown",
     "left_effector_type": "two_finger",
     "right_effector_type": "two_finger",
 }
+BASE_MOBILITY_ALLOWED_VALUES = ["fixed", "mobile", "unknown"]
+SUBTASK_STATE_ALLOWED_VALUES = ["normal", "abnormal"]
 SINGLE_ARM_SUBJECTS = {"effector", "arm", "base", "robot_body", "unknown"}
 DUAL_ARM_SUBJECTS = {
     "left_effector",
@@ -503,6 +509,7 @@ def infer_robot_setup_from_actions(actions, existing_setup=None):
                 value = str(existing_setup.get("single_effector_type", "")).strip()
                 robot_setup = {
                     "embodiment": "single_arm",
+                    "base_mobility_type": normalized_base_mobility(existing_setup),
                     "single_effector_type": (
                         value if value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
                     ),
@@ -512,6 +519,7 @@ def infer_robot_setup_from_actions(actions, existing_setup=None):
                 right_value = str(existing_setup.get("right_effector_type", "")).strip()
                 robot_setup = {
                     "embodiment": "dual_arm",
+                    "base_mobility_type": normalized_base_mobility(existing_setup),
                     "left_effector_type": (
                         left_value if left_value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
                     ),
@@ -523,6 +531,7 @@ def infer_robot_setup_from_actions(actions, existing_setup=None):
             value = str(existing_setup.get("single_effector_type", "")).strip()
             robot_setup = {
                 "embodiment": "single_arm",
+                "base_mobility_type": normalized_base_mobility(existing_setup),
                 "single_effector_type": (
                     value if value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
                 ),
@@ -532,6 +541,7 @@ def infer_robot_setup_from_actions(actions, existing_setup=None):
             right_value = str(existing_setup.get("right_effector_type", "")).strip()
             robot_setup = {
                 "embodiment": "dual_arm",
+                "base_mobility_type": normalized_base_mobility(existing_setup),
                 "left_effector_type": (
                     left_value if left_value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
                 ),
@@ -555,6 +565,11 @@ def infer_robot_setup_from_actions(actions, existing_setup=None):
             robot_setup["right_effector_type"] = "two_finger"
 
     return robot_setup
+
+
+def normalized_base_mobility(robot_setup):
+    value = str((robot_setup or {}).get("base_mobility_type", "unknown")).strip()
+    return value if value in BASE_MOBILITY_ALLOWED_VALUES else "unknown"
 
 
 def iter_annotation_actions(annotation):
@@ -732,6 +747,9 @@ def validate_subtask(subtask, skill_templates, coordination_modes, prefix="subta
     coordination_mode = subtask.get("coordination_mode")
     if coordination_mode not in coordination_modes:
         return f"{prefix} coordination_mode 不在 coordination_modes.yaml 中: {coordination_mode}"
+    state = str(subtask.get("state", "normal")).strip() or "normal"
+    if state not in SUBTASK_STATE_ALLOWED_VALUES:
+        return f"{prefix} state 必须属于 {SUBTASK_STATE_ALLOWED_VALUES}"
 
     actions = subtask.get("actions")
     if not isinstance(actions, list) or not actions:
@@ -780,7 +798,7 @@ def validate_subtask(subtask, skill_templates, coordination_modes, prefix="subta
         unknown_phase_keys = set(phase) - PHASE_ALLOWED_KEYS
         if unknown_phase_keys:
             return f"{phase_prefix} 出现未知字段: {sorted(unknown_phase_keys)}"
-        missing_phase_keys = PHASE_ALLOWED_KEYS - set(phase)
+        missing_phase_keys = PHASE_REQUIRED_KEYS - set(phase)
         if missing_phase_keys:
             return f"{phase_prefix} 缺少字段: {sorted(missing_phase_keys)}"
         try:
@@ -801,6 +819,11 @@ def validate_subtask(subtask, skill_templates, coordination_modes, prefix="subta
         previous_phase_end = phase_end
         if phase.get("action") not in PHASE_ACTION_ALLOWED_VALUES:
             return f"{phase_prefix} action 必须属于 {sorted(PHASE_ACTION_ALLOWED_VALUES)}"
+        target_action = str(phase.get("target_action", "primary")).strip() or "primary"
+        if target_action not in ("primary", "auxiliary"):
+            return f"{phase_prefix} target_action 必须是 primary 或 auxiliary"
+        if target_action == "auxiliary" and len(actions) < 2:
+            return f"{phase_prefix} target_action=auxiliary 需要存在 auxiliary_action"
         if allowed_phase_actions and phase.get("action") not in allowed_phase_actions:
             return (
                 f"{phase_prefix} action 不符合当前片段技能允许范围: "
@@ -857,6 +880,9 @@ def validate_robot_setup(robot_setup, prefix="robot_setup"):
         embodiment = "single_arm" if "single_effector_type" in robot_setup else "dual_arm"
     if embodiment not in ROBOT_EMBODIMENT_ALLOWED_VALUES:
         return f"{prefix}.embodiment 必须属于 {ROBOT_EMBODIMENT_ALLOWED_VALUES}"
+    base_mobility_type = normalized_base_mobility(robot_setup)
+    if str(robot_setup.get("base_mobility_type", "unknown")).strip() not in BASE_MOBILITY_ALLOWED_VALUES:
+        return f"{prefix}.base_mobility_type 必须属于 {BASE_MOBILITY_ALLOWED_VALUES}"
 
     required_keys = {"embodiment"} if has_embodiment else set()
     if embodiment == "single_arm":

@@ -46,12 +46,14 @@ class PhaseDialog(QDialog):
         object_options=None,
         phases=None,
         allowed_actions=None,
+        action_targets=None,
         parent=None,
     ):
         super().__init__(parent)
         self.setWindowTitle(bilingual_label("phase标注", "phase annotation"))
         self.phases = list(phases or [])
         self.allowed_actions = set(allowed_actions or [])
+        self.action_targets = list(action_targets or [("primary", "主动作(primary)")])
         max_frame = max(int(frame_count) - 1, 0)
         current_frame = max(0, min(int(current_frame), max_frame))
 
@@ -71,6 +73,9 @@ class PhaseDialog(QDialog):
         self.object_select = QComboBox()
         for value, label in (object_options or {}).items():
             self.object_select.addItem(option_label(str(value), str(label)), str(value))
+        self.target_action_select = QComboBox()
+        for value, label in self.action_targets:
+            self.target_action_select.addItem(str(label), str(value))
         self.add_phase_button = QPushButton("新增")
         self.update_phase_button = QPushButton("修改")
         self.delete_phase_button = QPushButton("删除")
@@ -83,6 +88,7 @@ class PhaseDialog(QDialog):
         form.addRow(bilingual_label("结束帧", "end frame"), self.end_frame_input)
         form.addRow(bilingual_label("动作", "action"), self.action_select)
         form.addRow(bilingual_label("物品", "object"), self.object_select)
+        form.addRow(bilingual_label("所属动作", "action owner"), self.target_action_select)
 
         phase_buttons = QHBoxLayout()
         phase_buttons.addWidget(self.add_phase_button)
@@ -111,6 +117,7 @@ class PhaseDialog(QDialog):
             "end_frame": end,
             "action": str(self.action_select.currentData() or self.action_select.currentText()),
             "object": str(self.object_select.currentData() or self.object_select.currentText()),
+            "target_action": str(self.target_action_select.currentData() or "primary"),
         }
 
     def refresh_phase_list(self):
@@ -118,6 +125,7 @@ class PhaseDialog(QDialog):
         for index, phase in enumerate(self.phases, start=1):
             item = QListWidgetItem(
                 f"{index}. {int(phase['start_frame'])}-{int(phase['end_frame'])}  "
+                f"{phase.get('target_action', 'primary')}  "
                 f"{phase.get('action', '')}  {phase.get('object', '')}"
             )
             self.phase_list_widget.addItem(item)
@@ -155,6 +163,9 @@ class PhaseDialog(QDialog):
         object_index = self.object_select.findData(phase.get("object"))
         if object_index >= 0:
             self.object_select.setCurrentIndex(object_index)
+        target_index = self.target_action_select.findData(phase.get("target_action", "primary"))
+        if target_index >= 0:
+            self.target_action_select.setCurrentIndex(target_index)
 
 
 class SegmentEditor(QWidget):
@@ -181,6 +192,9 @@ class SegmentEditor(QWidget):
         self.end_frame_input = QSpinBox()
         self.end_frame_input.setRange(0, 0)
         self.skill_select = QComboBox()
+        self.state_select = QComboBox()
+        self.state_select.addItem("正常(normal)", "normal")
+        self.state_select.addItem("异常(abnormal)", "abnormal")
 
         self.frame_controls_widget = QWidget()
         frame_controls = QHBoxLayout(self.frame_controls_widget)
@@ -209,6 +223,7 @@ class SegmentEditor(QWidget):
         form = QFormLayout()
         form.addRow(bilingual_label("起始帧", "start frame"), self.start_frame_input)
         form.addRow(bilingual_label("结束帧", "end frame"), self.end_frame_input)
+        form.addRow(bilingual_label("状态", "state"), self.state_select)
         form.addRow(bilingual_label("片段技能", "segment skill"), self.skill_select)
 
         self.phase_button = QPushButton("phase标注")
@@ -291,6 +306,7 @@ class SegmentEditor(QWidget):
         return {
             "start_frame": start,
             "end_frame": end,
+            "state": str(self.state_select.currentData() or "normal"),
             "skill_id": item.get("id", ""),
             "coordination_mode": template.get("coordination_mode", "single_hand"),
             "actions": template.get("actions") or [],
@@ -365,6 +381,7 @@ class SegmentEditor(QWidget):
             object_options=self.scene_object_options,
             phases=subtask.get("phases") or [],
             allowed_actions=self.allowed_phase_actions_for_subtask(subtask),
+            action_targets=self.action_targets_for_subtask(subtask),
             parent=self,
         )
         if dialog.exec_() != QDialog.Accepted:
@@ -386,6 +403,13 @@ class SegmentEditor(QWidget):
         subtask["phases"] = phases
         self.subtask_updated.emit(subtask)
 
+    def action_targets_for_subtask(self, subtask):
+        actions = (subtask or {}).get("actions") or []
+        targets = [("primary", "主动作(primary)")]
+        if len(actions) > 1:
+            targets.append(("auxiliary", "辅助动作(auxiliary)"))
+        return targets
+
     def refresh(self, selected_key=None):
         self.list_widget.clear()
         for index, (key, subtask) in enumerate(sorted(self.segments.items()), start=1):
@@ -406,6 +430,10 @@ class SegmentEditor(QWidget):
             self.end_frame_input.setValue(int(key[1]))
             subtask = self.segments.get(key)
             skill_id = subtask.get("skill_id") if isinstance(subtask, dict) else None
+            state = subtask.get("state", "normal") if isinstance(subtask, dict) else "normal"
+            state_index = self.state_select.findData(state)
+            if state_index >= 0:
+                self.state_select.setCurrentIndex(state_index)
             for index in range(self.skill_select.count()):
                 item = self.skill_select.itemData(index)
                 if isinstance(item, dict) and item.get("id") == skill_id:

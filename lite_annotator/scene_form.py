@@ -47,6 +47,11 @@ ROBOT_EMBODIMENT_OPTIONS = {
     "dual_arm": "双臂",
     "single_arm": "单臂",
 }
+BASE_MOBILITY_OPTIONS = {
+    "unknown": "未知",
+    "fixed": "固定底座",
+    "mobile": "移动底盘",
+}
 
 
 class ObjectEditDialog(QDialog):
@@ -140,6 +145,9 @@ class SceneForm(QWidget):
         self.robot_embodiment = QComboBox()
         for value, label in ROBOT_EMBODIMENT_OPTIONS.items():
             self.robot_embodiment.addItem(option_label(value, label), value)
+        self.base_mobility_type = QComboBox()
+        for value, label in BASE_MOBILITY_OPTIONS.items():
+            self.base_mobility_type.addItem(option_label(value, label), value)
         self.single_effector_type = self.create_effector_type_combo()
         self.left_effector_type = self.create_effector_type_combo()
         self.right_effector_type = self.create_effector_type_combo()
@@ -148,6 +156,7 @@ class SceneForm(QWidget):
         self.space.editTextChanged.connect(self.scene_changed.emit)
         self.robot_embodiment.currentIndexChanged.connect(self.update_robot_setup_visibility)
         self.robot_embodiment.currentIndexChanged.connect(self.scene_changed.emit)
+        self.base_mobility_type.currentIndexChanged.connect(self.scene_changed.emit)
         self.single_effector_type.currentIndexChanged.connect(self.scene_changed.emit)
         self.left_effector_type.currentIndexChanged.connect(self.scene_changed.emit)
         self.right_effector_type.currentIndexChanged.connect(self.scene_changed.emit)
@@ -169,6 +178,7 @@ class SceneForm(QWidget):
         form.addRow(bilingual_label("任务类型", "task type"), self.task_type)
         form.addRow(bilingual_label("空间", "space"), self.space)
         form.addRow(bilingual_label("机器人形态", "robot embodiment"), self.robot_embodiment)
+        form.addRow(bilingual_label("底盘移动类型", "base mobility type"), self.base_mobility_type)
         self.single_effector_label = QLabel(bilingual_label("末端类型", "effector type"))
         self.left_effector_label = QLabel(bilingual_label("左手末端类型", "left effector type"))
         self.right_effector_label = QLabel(bilingual_label("右手末端类型", "right effector type"))
@@ -308,10 +318,12 @@ class SceneForm(QWidget):
         if embodiment == "single_arm":
             return {
                 "embodiment": "single_arm",
+                "base_mobility_type": str(self.base_mobility_type.currentData() or "unknown"),
                 "single_effector_type": str(self.single_effector_type.currentData() or "two_finger"),
             }
         return {
             "embodiment": "dual_arm",
+            "base_mobility_type": str(self.base_mobility_type.currentData() or "unknown"),
             "left_effector_type": str(self.left_effector_type.currentData() or "two_finger"),
             "right_effector_type": str(self.right_effector_type.currentData() or "two_finger"),
         }
@@ -322,6 +334,10 @@ class SceneForm(QWidget):
         if not embodiment:
             embodiment = "single_arm" if "single_effector_type" in robot_setup else "dual_arm"
         self.set_combo_value(self.robot_embodiment, embodiment)
+        self.set_combo_value(
+            self.base_mobility_type,
+            robot_setup.get("base_mobility_type", "unknown"),
+        )
         self.set_combo_value(
             self.single_effector_type,
             robot_setup.get("single_effector_type", "two_finger"),

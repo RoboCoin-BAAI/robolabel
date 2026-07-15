@@ -418,7 +418,7 @@ class MainWindow(QMainWindow):
     def load_episode(self, episode: EpisodeItem):
         self.save_draft_annotation()
         self.current_episode = episode
-        self.current_video_path = episode.primary_video_path
+        self.current_video_path = episode.camera_videos.get(self.main_camera) or episode.primary_video_path
         self.current_annotation_stem = episode.annotation_stem
         try:
             self.video_player.load_episode(episode.camera_videos, self.main_camera)
@@ -456,12 +456,13 @@ class MainWindow(QMainWindow):
             camera: str(path)
             for camera, path in episode.camera_videos.items()
         }
+        primary_video_path = episode.camera_videos.get(self.main_camera) or episode.primary_video_path
         return {
             "episode_id": episode.episode_id,
             "task_id": episode.display_name,
             "dataset_name": episode.dataset_root.name,
-            "video_path": str(episode.primary_video_path),
-            "primary_video_path": str(episode.primary_video_path),
+            "video_path": str(primary_video_path),
+            "primary_video_path": str(primary_video_path),
             "views": views,
             "frames": self.video_player.frame_count,
         }
@@ -707,7 +708,8 @@ class MainWindow(QMainWindow):
         standard_annotation = to_standard_annotation(
             annotation,
             dataset_type=self.dataset_type,
-            data_path=self.dataset_root,
+            data_path=self.current_video_path,
+            dataset_root=self.dataset_root,
         )
         export_path.write_text(
             json.dumps(standard_annotation, ensure_ascii=False, indent=2),

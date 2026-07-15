@@ -114,8 +114,7 @@ class SkillForm(QWidget):
             editor = QComboBox()
             editor.setEditable(True)
             editor.setInsertPolicy(QComboBox.NoInsert)
-            for value, label in self.scene_object_options.items():
-                editor.addItem(bilingual_label(label, value), value)
+            self.add_scene_object_options(editor)
             if editor.isEditable():
                 self.attach_combo_completer(editor)
             editor.currentIndexChanged.connect(self.update_preview)
@@ -134,15 +133,15 @@ class SkillForm(QWidget):
                     value for value in allowed_values
                     if value in allowed_subjects
                 ]
+            if slot in {"source_anchor", "destination_anchor"} and self.scene_object_options:
+                self.add_scene_object_options(editor)
             for value in allowed_values:
+                if editor.findData(value) >= 0:
+                    continue
                 editor.addItem(
                     bilingual_label(display_names.get(value, value), value),
                     value,
                 )
-            if slot == "destination_anchor" and self.scene_object_options:
-                for value, label in self.scene_object_options.items():
-                    if editor.findData(value) < 0:
-                        editor.addItem(bilingual_label(label, value), value)
             if editor.isEditable():
                 self.attach_combo_completer(editor)
             editor.currentIndexChanged.connect(self.update_preview)
@@ -152,6 +151,11 @@ class SkillForm(QWidget):
         editor = QLineEdit()
         editor.textChanged.connect(self.update_preview)
         return editor
+
+    def add_scene_object_options(self, editor):
+        for value, label in self.scene_object_options.items():
+            if editor.findData(value) < 0:
+                editor.addItem(bilingual_label(label, value), value)
 
     def attach_combo_completer(self, combo):
         completer = QCompleter([combo.itemText(index) for index in range(combo.count())], combo)
@@ -164,7 +168,10 @@ class SkillForm(QWidget):
         if isinstance(widget, QComboBox):
             text = widget.currentText().strip()
             for index in range(widget.count()):
-                if text in (widget.itemText(index), str(widget.itemData(index))):
+                item_data = str(widget.itemData(index) or "").strip()
+                item_text = widget.itemText(index).strip()
+                object_label = str(self.scene_object_options.get(item_data, "")).strip()
+                if text in (item_text, item_data, object_label):
                     return str(widget.itemData(index) or "").strip()
             return text
         return widget.text().strip()
