@@ -252,12 +252,38 @@ class MainWindow(QMainWindow):
         if dialog.exec_() != QDialog.Accepted:
             return
 
+        self.save_draft_annotation()
         self.dataset_root = root
         self.dataset_type = dataset_type
         self.selected_cameras = dialog.selected_cameras
         self.main_camera = dialog.main_camera
+        self.reset_current_annotation_state()
         self.load_skill_templates_for_dataset()
         self.refresh_episode_list()
+
+    def reset_current_annotation_state(self):
+        self.loading_episode = True
+        try:
+            self.current_episode = None
+            self.current_video_path = None
+            self.current_annotation_stem = None
+            self.annotation = None
+            self.skill_library = {"version": 1, "skills": []}
+            self.skill_library_list.clear()
+            self.segment_editor.set_skill_items([])
+            self.segment_editor.set_segments([])
+            self.segment_editor.set_scene_objects({})
+            self.video_player.reset_episode()
+            self.video_text.clear()
+            self.scene_form.blockSignals(True)
+            try:
+                self.scene_form.clear()
+            finally:
+                self.scene_form.blockSignals(False)
+            self.scene_form.set_referenced_objects(set())
+            self.validation_messages.clear()
+        finally:
+            self.loading_episode = False
 
     def load_skill_templates_for_dataset(self):
         if not self.dataset_root:

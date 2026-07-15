@@ -100,6 +100,19 @@ class MultiCameraVideoPlayer(QWidget):
         self.camera_labels = {"__placeholder__": label}
         self.set_current_subtask(None)
 
+    def reset_episode(self):
+        self.timer.stop()
+        self.frames_by_camera = {}
+        self.main_camera = None
+        self.current_frame = 0
+        self.slider.blockSignals(True)
+        self.slider.setRange(0, 0)
+        self.slider.setValue(0)
+        self.slider.blockSignals(False)
+        self.frame_label.setText(f"{bilingual_label('帧', 'frame')}: -/-")
+        self.play_button.setText(bilingual_label("播放", "play"))
+        self.set_placeholder()
+
     def clear_grid(self):
         while self.video_grid.count():
             item = self.video_grid.takeAt(0)
