@@ -53,7 +53,13 @@ SUBTASK_ALLOWED_KEYS = {
     "phases",
 }
 SUBTASK_REQUIRED_KEYS = SUBTASK_ALLOWED_KEYS - {"phases"}
-ROBOT_SETUP_ALLOWED_KEYS = {"left_effector_type", "right_effector_type"}
+ROBOT_EMBODIMENT_ALLOWED_VALUES = ["single_arm", "dual_arm"]
+ROBOT_SETUP_ALLOWED_KEYS = {
+    "embodiment",
+    "single_effector_type",
+    "left_effector_type",
+    "right_effector_type",
+}
 SCENE_OBJECT_ALLOWED_KEYS = {"name", "role", "support_or_region", "states", "affordance"}
 SCENE_LOCATION_ALLOWED_KEYS = {"space", "anchor"}
 EPISODE_ALLOWED_KEYS = {
@@ -95,8 +101,21 @@ EFFECTOR_TYPE_DISPLAY_NAMES = {
     "five_finger": "五指末端",
 }
 DEFAULT_ROBOT_SETUP = {
+    "embodiment": "dual_arm",
     "left_effector_type": "two_finger",
     "right_effector_type": "two_finger",
+}
+SINGLE_ARM_SUBJECTS = {"effector", "arm", "base", "robot_body", "unknown"}
+DUAL_ARM_SUBJECTS = {
+    "left_effector",
+    "right_effector",
+    "both_effectors",
+    "base",
+    "robot_body",
+    "left_arm",
+    "right_arm",
+    "both_arms",
+    "unknown",
 }
 LEGACY_SUBJECT_MAP = {
     "left_gripper": "left_effector",
@@ -462,16 +481,69 @@ def default_robot_setup():
     return dict(DEFAULT_ROBOT_SETUP)
 
 
+def robot_embodiment(robot_setup):
+    if not isinstance(robot_setup, dict):
+        return "dual_arm"
+    value = str(robot_setup.get("embodiment", "")).strip()
+    return value if value in ROBOT_EMBODIMENT_ALLOWED_VALUES else "dual_arm"
+
+
+def allowed_subjects_for_robot_setup(robot_setup):
+    if robot_embodiment(robot_setup) == "single_arm":
+        return set(SINGLE_ARM_SUBJECTS)
+    return set(DUAL_ARM_SUBJECTS)
+
+
 def infer_robot_setup_from_actions(actions, existing_setup=None):
     robot_setup = default_robot_setup()
     if isinstance(existing_setup, dict):
-        for key in ROBOT_SETUP_ALLOWED_KEYS:
-            value = str(existing_setup.get(key, "")).strip()
-            if value in EFFECTOR_TYPE_ALLOWED_VALUES:
-                robot_setup[key] = value
+        embodiment = str(existing_setup.get("embodiment", "")).strip()
+        if embodiment in ROBOT_EMBODIMENT_ALLOWED_VALUES:
+            if embodiment == "single_arm":
+                value = str(existing_setup.get("single_effector_type", "")).strip()
+                robot_setup = {
+                    "embodiment": "single_arm",
+                    "single_effector_type": (
+                        value if value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
+                    ),
+                }
+            else:
+                left_value = str(existing_setup.get("left_effector_type", "")).strip()
+                right_value = str(existing_setup.get("right_effector_type", "")).strip()
+                robot_setup = {
+                    "embodiment": "dual_arm",
+                    "left_effector_type": (
+                        left_value if left_value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
+                    ),
+                    "right_effector_type": (
+                        right_value if right_value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
+                    ),
+                }
+        elif "single_effector_type" in existing_setup:
+            value = str(existing_setup.get("single_effector_type", "")).strip()
+            robot_setup = {
+                "embodiment": "single_arm",
+                "single_effector_type": (
+                    value if value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
+                ),
+            }
+        else:
+            left_value = str(existing_setup.get("left_effector_type", "")).strip()
+            right_value = str(existing_setup.get("right_effector_type", "")).strip()
+            robot_setup = {
+                "embodiment": "dual_arm",
+                "left_effector_type": (
+                    left_value if left_value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
+                ),
+                "right_effector_type": (
+                    right_value if right_value in EFFECTOR_TYPE_ALLOWED_VALUES else "two_finger"
+                ),
+            }
 
     for action in actions:
         if not isinstance(action, dict):
+            continue
+        if robot_setup.get("embodiment") == "single_arm":
             continue
         subject = str(action.get("subject", "")).strip()
         if subject == "left_gripper":
@@ -778,14 +850,45 @@ def validate_robot_setup(robot_setup, prefix="robot_setup"):
     unknown_keys = set(robot_setup) - ROBOT_SETUP_ALLOWED_KEYS
     if unknown_keys:
         return f"{prefix} 出现未知字段: {sorted(unknown_keys)}"
-    missing_keys = ROBOT_SETUP_ALLOWED_KEYS - set(robot_setup)
+
+    has_embodiment = "embodiment" in robot_setup
+    embodiment = str(robot_setup.get("embodiment", "")).strip()
+    if not embodiment:
+        embodiment = "single_arm" if "single_effector_type" in robot_setup else "dual_arm"
+    if embodiment not in ROBOT_EMBODIMENT_ALLOWED_VALUES:
+        return f"{prefix}.embodiment 必须属于 {ROBOT_EMBODIMENT_ALLOWED_VALUES}"
+
+    required_keys = {"embodiment"} if has_embodiment else set()
+    if embodiment == "single_arm":
+        required_keys.add("single_effector_type")
+        disallowed_keys = {"left_effector_type", "right_effector_type"} & set(robot_setup)
+    else:
+        required_keys.update({"left_effector_type", "right_effector_type"})
+        disallowed_keys = {"single_effector_type"} & set(robot_setup)
+    if disallowed_keys:
+        return f"{prefix} 在 {embodiment} 模式下不应包含字段: {sorted(disallowed_keys)}"
+    missing_keys = required_keys - set(robot_setup)
     if missing_keys:
         return f"{prefix} 缺少字段: {sorted(missing_keys)}"
 
-    for field_name in sorted(ROBOT_SETUP_ALLOWED_KEYS):
+    effector_fields = required_keys - {"embodiment"}
+    for field_name in sorted(effector_fields):
         value = str(robot_setup.get(field_name, "")).strip()
         if value not in EFFECTOR_TYPE_ALLOWED_VALUES:
             return f"{prefix}.{field_name} 必须属于 {EFFECTOR_TYPE_ALLOWED_VALUES}"
+    return None
+
+
+def validate_subjects_for_robot_setup(subtasks, robot_setup, prefix="subtasks"):
+    allowed_subjects = allowed_subjects_for_robot_setup(robot_setup)
+    for subtask_idx, subtask in enumerate(subtasks or []):
+        for action_idx, action in enumerate((subtask or {}).get("actions") or []):
+            subject = normalize_subject((action or {}).get("subject", ""))
+            if subject not in allowed_subjects:
+                return (
+                    f"{prefix}[{subtask_idx}].actions[{action_idx}] subject={subject} "
+                    f"不符合机器人形态 {robot_embodiment(robot_setup)}"
+                )
     return None
 
 
@@ -864,6 +967,12 @@ def validate_annotation(annotation, skill_templates=None, coordination_modes=Non
     subtasks = annotation.get("subtasks")
     if not isinstance(subtasks, list) or not subtasks:
         return "subtasks 必须非空"
+    subject_setup_error = validate_subjects_for_robot_setup(
+        subtasks,
+        annotation.get("robot_setup"),
+    )
+    if subject_setup_error:
+        return subject_setup_error
 
     try:
         sorted_subtasks = sorted(subtasks, key=lambda item: int(item["start_frame"]))

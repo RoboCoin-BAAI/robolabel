@@ -27,6 +27,8 @@ slot_display_names:
   description: 语义描述
 enum_constraints:
   subject:
+  - effector
+  - arm
   - left_effector
   - right_effector
   - both_effectors
@@ -38,6 +40,8 @@ enum_constraints:
   - unknown
 enum_display_names:
   subject:
+    effector: 末端
+    arm: 机械臂
     left_effector: 左末端
     right_effector: 右末端
     both_effectors: 双末端

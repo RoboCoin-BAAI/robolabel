@@ -43,6 +43,10 @@ EFFECTOR_TYPE_OPTIONS = {
     "four_finger": "四指末端",
     "five_finger": "五指末端",
 }
+ROBOT_EMBODIMENT_OPTIONS = {
+    "dual_arm": "双臂",
+    "single_arm": "单臂",
+}
 
 
 class ObjectEditDialog(QDialog):
@@ -133,11 +137,18 @@ class SceneForm(QWidget):
         self.space.setEditable(True)
         for value, label in SPACE_OPTIONS.items():
             self.space.addItem(option_label(value, label), value)
+        self.robot_embodiment = QComboBox()
+        for value, label in ROBOT_EMBODIMENT_OPTIONS.items():
+            self.robot_embodiment.addItem(option_label(value, label), value)
+        self.single_effector_type = self.create_effector_type_combo()
         self.left_effector_type = self.create_effector_type_combo()
         self.right_effector_type = self.create_effector_type_combo()
         self.task_type.currentIndexChanged.connect(self.scene_changed.emit)
         self.space.currentIndexChanged.connect(self.scene_changed.emit)
         self.space.editTextChanged.connect(self.scene_changed.emit)
+        self.robot_embodiment.currentIndexChanged.connect(self.update_robot_setup_visibility)
+        self.robot_embodiment.currentIndexChanged.connect(self.scene_changed.emit)
+        self.single_effector_type.currentIndexChanged.connect(self.scene_changed.emit)
         self.left_effector_type.currentIndexChanged.connect(self.scene_changed.emit)
         self.right_effector_type.currentIndexChanged.connect(self.scene_changed.emit)
 
@@ -157,8 +168,13 @@ class SceneForm(QWidget):
         form = QFormLayout()
         form.addRow(bilingual_label("任务类型", "task type"), self.task_type)
         form.addRow(bilingual_label("空间", "space"), self.space)
-        form.addRow(bilingual_label("左手末端类型", "left effector type"), self.left_effector_type)
-        form.addRow(bilingual_label("右手末端类型", "right effector type"), self.right_effector_type)
+        form.addRow(bilingual_label("机器人形态", "robot embodiment"), self.robot_embodiment)
+        self.single_effector_label = QLabel(bilingual_label("末端类型", "effector type"))
+        self.left_effector_label = QLabel(bilingual_label("左手末端类型", "left effector type"))
+        self.right_effector_label = QLabel(bilingual_label("右手末端类型", "right effector type"))
+        form.addRow(self.single_effector_label, self.single_effector_type)
+        form.addRow(self.left_effector_label, self.left_effector_type)
+        form.addRow(self.right_effector_label, self.right_effector_type)
         objects_box = QWidget()
         objects_layout = QVBoxLayout(objects_box)
         objects_layout.setContentsMargins(0, 0, 0, 0)
@@ -173,12 +189,22 @@ class SceneForm(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
+        self.update_robot_setup_visibility()
 
     def create_effector_type_combo(self):
         combo = QComboBox()
         for value, label in EFFECTOR_TYPE_OPTIONS.items():
             combo.addItem(option_label(value, label), value)
         return combo
+
+    def update_robot_setup_visibility(self):
+        is_single_arm = self.robot_embodiment.currentData() == "single_arm"
+        self.single_effector_label.setVisible(is_single_arm)
+        self.single_effector_type.setVisible(is_single_arm)
+        self.left_effector_label.setVisible(not is_single_arm)
+        self.left_effector_type.setVisible(not is_single_arm)
+        self.right_effector_label.setVisible(not is_single_arm)
+        self.right_effector_type.setVisible(not is_single_arm)
 
     def add_object_item(self, value="", affordance=None):
         self.objects.append({
@@ -278,13 +304,28 @@ class SceneForm(QWidget):
         }
 
     def build_robot_setup(self):
+        embodiment = str(self.robot_embodiment.currentData() or "dual_arm")
+        if embodiment == "single_arm":
+            return {
+                "embodiment": "single_arm",
+                "single_effector_type": str(self.single_effector_type.currentData() or "two_finger"),
+            }
         return {
+            "embodiment": "dual_arm",
             "left_effector_type": str(self.left_effector_type.currentData() or "two_finger"),
             "right_effector_type": str(self.right_effector_type.currentData() or "two_finger"),
         }
 
     def load_robot_setup(self, robot_setup):
         robot_setup = robot_setup if isinstance(robot_setup, dict) else {}
+        embodiment = robot_setup.get("embodiment")
+        if not embodiment:
+            embodiment = "single_arm" if "single_effector_type" in robot_setup else "dual_arm"
+        self.set_combo_value(self.robot_embodiment, embodiment)
+        self.set_combo_value(
+            self.single_effector_type,
+            robot_setup.get("single_effector_type", "two_finger"),
+        )
         self.set_combo_value(
             self.left_effector_type,
             robot_setup.get("left_effector_type", "two_finger"),
@@ -293,6 +334,7 @@ class SceneForm(QWidget):
             self.right_effector_type,
             robot_setup.get("right_effector_type", "two_finger"),
         )
+        self.update_robot_setup_visibility()
 
     def build_scene(self):
         space = self.selected_space_value()

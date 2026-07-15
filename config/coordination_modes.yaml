@@ -5,6 +5,8 @@ coordination_modes:
     main_skill_rule: actions[0].skill
     action_rule: 一个 action，通常是一只手或一个夹爪完成主要动作
     allowed_primary_subjects:
+      - effector
+      - arm
       - left_effector
       - right_effector
       - base

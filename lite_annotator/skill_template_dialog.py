@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
 from common.skill_schema import (
     build_action_from_slot_values,
     load_coordination_modes,
+    robot_embodiment,
     render_subtask_text,
 )
 from lite_annotator.skill_form import SKILL_TEMPLATES, SkillForm
@@ -21,11 +22,21 @@ from lite_annotator.ui_text import bilingual_label
 
 
 class SkillTemplateDialog(QDialog):
-    def __init__(self, parent=None, scene_object_options=None):
+    def __init__(self, parent=None, scene_object_options=None, robot_setup=None):
         super().__init__(parent)
         self.setWindowTitle(bilingual_label("片段技能填写", "segment skill entry"))
-        self.skill_form = SkillForm(self, scene_object_options=scene_object_options)
-        self.auxiliary_skill_form = SkillForm(self, scene_object_options=scene_object_options)
+        self.robot_setup = dict(robot_setup or {})
+        self.is_single_arm = robot_embodiment(self.robot_setup) == "single_arm"
+        self.skill_form = SkillForm(
+            self,
+            scene_object_options=scene_object_options,
+            robot_setup=self.robot_setup,
+        )
+        self.auxiliary_skill_form = SkillForm(
+            self,
+            scene_object_options=scene_object_options,
+            robot_setup=self.robot_setup,
+        )
         self.auxiliary_skill_form.setVisible(False)
         self.custom_skill_checkbox = QCheckBox(
             bilingual_label("自定义片段技能", "custom segment skill"),
@@ -42,6 +53,8 @@ class SkillTemplateDialog(QDialog):
         self.coordination_modes = load_coordination_modes()
         self.coordination_mode_select = QComboBox(self)
         for mode_id, mode in self.coordination_modes.items():
+            if self.is_single_arm and mode_id != "single_hand":
+                continue
             self.coordination_mode_select.addItem(
                 bilingual_label(mode.get("display_name", mode_id), mode_id),
                 mode_id,
@@ -69,6 +82,7 @@ class SkillTemplateDialog(QDialog):
         auxiliary_layout = QVBoxLayout(auxiliary_group)
         auxiliary_layout.addWidget(self.auxiliary_action_checkbox)
         auxiliary_layout.addWidget(self.auxiliary_skill_form)
+        auxiliary_group.setVisible(not self.is_single_arm)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         buttons.button(QDialogButtonBox.Ok).setText(bilingual_label("确定", "ok"))
@@ -83,7 +97,9 @@ class SkillTemplateDialog(QDialog):
         layout.addWidget(primary_group)
         layout.addWidget(auxiliary_group)
         layout.addWidget(buttons)
-        self.structured_groups = [coordination_group, primary_group, auxiliary_group]
+        self.structured_groups = [coordination_group, primary_group]
+        if not self.is_single_arm:
+            self.structured_groups.append(auxiliary_group)
 
     def set_coordination_mode(self, mode_id):
         for index in range(self.coordination_mode_select.count()):
@@ -92,6 +108,11 @@ class SkillTemplateDialog(QDialog):
                 return
 
     def on_auxiliary_toggled(self, enabled):
+        if self.is_single_arm:
+            self.auxiliary_action_checkbox.setChecked(False)
+            self.auxiliary_skill_form.setVisible(False)
+            self.set_coordination_mode("single_hand")
+            return
         self.auxiliary_skill_form.setVisible(enabled)
         if enabled and self.coordination_mode_select.currentData() == "single_hand":
             self.set_coordination_mode("primary_with_support")

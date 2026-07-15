@@ -498,6 +498,7 @@ class MainWindow(QMainWindow):
         dialog = SkillTemplateDialog(
             self,
             scene_object_options=self.scene_form.selected_object_options(),
+            robot_setup=self.scene_form.build_robot_setup(),
         )
         if dialog.exec_() != QDialog.Accepted:
             return None

@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 )
 
 from common.skill_schema import (
+    allowed_subjects_for_robot_setup,
     build_action_from_slot_values,
     load_skill_templates,
     render_subtask_text,
@@ -39,10 +40,11 @@ OBJECT_SLOT_KEYS = load_object_slot_keys()
 
 
 class SkillForm(QWidget):
-    def __init__(self, parent=None, scene_object_options=None):
+    def __init__(self, parent=None, scene_object_options=None, robot_setup=None):
         super().__init__(parent)
         self.slot_widgets = {}
         self.scene_object_options = scene_object_options or {}
+        self.robot_setup = dict(robot_setup or {})
         self.skill_select = QComboBox()
         for skill_id, skill in SKILL_TEMPLATES.items():
             if skill_id == "custom":
@@ -66,6 +68,10 @@ class SkillForm(QWidget):
         layout.addWidget(self.skill_info)
         layout.addLayout(self.form_layout)
         layout.addWidget(self.preview)
+        self.render_slots()
+
+    def set_robot_setup(self, robot_setup):
+        self.robot_setup = dict(robot_setup or {})
         self.render_slots()
 
     def current_skill_id(self):
@@ -110,7 +116,8 @@ class SkillForm(QWidget):
             editor.setInsertPolicy(QComboBox.NoInsert)
             for value, label in self.scene_object_options.items():
                 editor.addItem(bilingual_label(label, value), value)
-            self.attach_combo_completer(editor)
+            if editor.isEditable():
+                self.attach_combo_completer(editor)
             editor.currentIndexChanged.connect(self.update_preview)
             editor.editTextChanged.connect(self.update_preview)
             return editor
@@ -118,9 +125,15 @@ class SkillForm(QWidget):
         allowed_values = skill.get("enum_constraints", {}).get(slot)
         if allowed_values:
             editor = QComboBox()
-            editor.setEditable(True)
+            editor.setEditable(slot != "subject")
             editor.setInsertPolicy(QComboBox.NoInsert)
             display_names = skill.get("enum_display_names", {}).get(slot, {})
+            if slot == "subject":
+                allowed_subjects = allowed_subjects_for_robot_setup(self.robot_setup)
+                allowed_values = [
+                    value for value in allowed_values
+                    if value in allowed_subjects
+                ]
             for value in allowed_values:
                 editor.addItem(
                     bilingual_label(display_names.get(value, value), value),
@@ -130,7 +143,8 @@ class SkillForm(QWidget):
                 for value, label in self.scene_object_options.items():
                     if editor.findData(value) < 0:
                         editor.addItem(bilingual_label(label, value), value)
-            self.attach_combo_completer(editor)
+            if editor.isEditable():
+                self.attach_combo_completer(editor)
             editor.currentIndexChanged.connect(self.update_preview)
             editor.editTextChanged.connect(self.update_preview)
             return editor
