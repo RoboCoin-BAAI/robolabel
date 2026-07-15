@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
 
 from lite_annotator.ui_text import bilingual_label
 from lite_annotator.ui_theme import scaled
-from lite_annotator.video_decode import decode_video_frames
+from lite_annotator.video_decode import VideoFrameReader
 from lite_annotator.vocabulary import option_label
 
 
@@ -141,7 +141,7 @@ class MultiCameraVideoPlayer(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.frames_by_camera: dict[str, list] = {}
+        self.readers_by_camera: dict[str, VideoFrameReader] = {}
         self.main_camera: str | None = None
         self.current_subtask: dict | None = None
         self.object_display_labels: dict[str, str] = {}
@@ -200,9 +200,9 @@ class MultiCameraVideoPlayer(QWidget):
 
     @property
     def frame_count(self) -> int:
-        if not self.frames_by_camera:
+        if not self.readers_by_camera:
             return 0
-        return min(len(frames) for frames in self.frames_by_camera.values())
+        return min(reader.frame_count for reader in self.readers_by_camera.values())
 
     def set_placeholder(self):
         self.clear_grid()
@@ -215,7 +215,8 @@ class MultiCameraVideoPlayer(QWidget):
 
     def reset_episode(self):
         self.timer.stop()
-        self.frames_by_camera = {}
+        self.close_readers()
+        self.readers_by_camera = {}
         self.main_camera = None
         self.current_frame = 0
         self.slider.blockSignals(True)
@@ -236,19 +237,24 @@ class MultiCameraVideoPlayer(QWidget):
             if widget is not None:
                 widget.deleteLater()
 
+    def close_readers(self):
+        for reader in self.readers_by_camera.values():
+            reader.close()
+
     def load_episode(self, camera_videos: dict[str, Path], main_camera: str | None = None) -> None:
         if not camera_videos:
             raise RuntimeError("No camera videos selected")
         if len(camera_videos) > 3:
             raise RuntimeError("最多选择 3 个相机")
 
-        loaded: dict[str, list] = {}
+        self.close_readers()
+        loaded: dict[str, VideoFrameReader] = {}
         for camera, video_path in camera_videos.items():
-            loaded[camera] = decode_video_frames(video_path)
+            loaded[camera] = VideoFrameReader(video_path)
 
         self.timer.stop()
         self.play_button.setText(bilingual_label("播放", "play"))
-        self.frames_by_camera = loaded
+        self.readers_by_camera = loaded
         self.main_camera = main_camera if main_camera in loaded else next(iter(loaded))
         self.current_frame = 0
         self.rebuild_camera_grid()
@@ -305,10 +311,10 @@ class MultiCameraVideoPlayer(QWidget):
         return scaled(self.AUX_FRAME_SIZE[0]), scaled(self.AUX_FRAME_SIZE[1])
 
     def ordered_cameras(self) -> list[str]:
-        cameras = list(self.frames_by_camera)
+        cameras = list(self.readers_by_camera)
         if not cameras:
             return []
-        main_camera = self.main_camera if self.main_camera in self.frames_by_camera else cameras[0]
+        main_camera = self.main_camera if self.main_camera in self.readers_by_camera else cameras[0]
         return [main_camera] + [camera for camera in cameras if camera != main_camera]
 
     def show_frame_after_layout(self) -> None:
@@ -359,12 +365,12 @@ class MultiCameraVideoPlayer(QWidget):
         self.info_label.setText("\n".join(lines))
 
     def show_frame(self, index: int) -> None:
-        if not self.frames_by_camera:
+        if not self.readers_by_camera:
             return
         index = max(0, min(index, self.frame_count - 1))
         self.current_frame = index
-        for camera, frames in self.frames_by_camera.items():
-            frame = frames[index]
+        for camera, reader in self.readers_by_camera.items():
+            frame = reader.read(index)
             height, width, channels = frame.shape
             image = QImage(frame.data, width, height, channels * width, QImage.Format_RGB888)
             label = self.camera_labels[camera]
@@ -385,7 +391,7 @@ class MultiCameraVideoPlayer(QWidget):
         self.show_frame(index)
 
     def next_frame(self) -> None:
-        if not self.frames_by_camera:
+        if not self.readers_by_camera:
             return
         if self.current_frame >= self.frame_count - 1:
             self.timer.stop()
@@ -407,3 +413,7 @@ class MultiCameraVideoPlayer(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.show_frame(self.current_frame)
+
+    def closeEvent(self, event):
+        self.close_readers()
+        super().closeEvent(event)

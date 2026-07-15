@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import OrderedDict
 import shutil
 import subprocess
 from contextlib import contextmanager
@@ -9,6 +10,97 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+
+
+class VideoFrameReader:
+    def __init__(self, path: str | Path, cache_size: int = 48):
+        self.path = Path(path)
+        self.cache_size = max(int(cache_size), 1)
+        self.cache: OrderedDict[int, np.ndarray] = OrderedDict()
+        self.capture = cv2.VideoCapture(str(self.path))
+        self.width = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        self.height = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        self.fps = float(self.capture.get(cv2.CAP_PROP_FPS) or 0.0)
+        self.frame_count = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+
+        if self.width <= 0 or self.height <= 0 or self.frame_count <= 0:
+            info = probe_video_info(self.path)
+            self.width = info["width"]
+            self.height = info["height"]
+            self.fps = info["fps"]
+            self.frame_count = info["frame_count"]
+
+        self.use_ffmpeg = False
+        test_frame = self._read_with_opencv(0)
+        if test_frame is None:
+            self.use_ffmpeg = True
+        else:
+            self.cache[0] = test_frame
+
+    def read(self, index: int) -> np.ndarray:
+        if self.frame_count <= 0:
+            raise RuntimeError(f"Could not decode video: {self.path}")
+        index = max(0, min(int(index), self.frame_count - 1))
+        if index in self.cache:
+            frame = self.cache.pop(index)
+            self.cache[index] = frame
+            return frame
+
+        frame = self._read_with_ffmpeg(index) if self.use_ffmpeg else self._read_with_opencv(index)
+        if frame is None:
+            frame = self._read_with_ffmpeg(index)
+            self.use_ffmpeg = True
+        if frame is None:
+            raise RuntimeError(f"Could not decode video frame {index}: {self.path}")
+        self.cache[index] = frame
+        while len(self.cache) > self.cache_size:
+            self.cache.popitem(last=False)
+        return frame
+
+    def close(self) -> None:
+        if self.capture is not None:
+            self.capture.release()
+            self.capture = None
+        self.cache.clear()
+
+    def _read_with_opencv(self, index: int) -> np.ndarray | None:
+        if self.capture is None:
+            self.capture = cv2.VideoCapture(str(self.path))
+        with muted_stderr():
+            self.capture.set(cv2.CAP_PROP_POS_FRAMES, index)
+            success, frame = self.capture.read()
+        if not success or frame is None:
+            return None
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    def _read_with_ffmpeg(self, index: int) -> np.ndarray | None:
+        if shutil.which("ffmpeg") is None:
+            return None
+        timestamp = 0.0 if self.fps <= 0 else index / self.fps
+        command = [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-ss",
+            f"{timestamp:.6f}",
+            "-i",
+            str(self.path),
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "pipe:1",
+        ]
+        result = subprocess.run(command, capture_output=True)
+        frame_size = self.width * self.height * 3
+        if result.returncode != 0 or len(result.stdout) != frame_size:
+            return None
+        return np.frombuffer(result.stdout, dtype=np.uint8).reshape(
+            (self.height, self.width, 3)
+        ).copy()
 
 
 def read_video_rgb_frames(path: str | Path) -> list[np.ndarray]:
@@ -82,6 +174,11 @@ def read_video_with_ffmpeg(path: Path) -> list[np.ndarray]:
 
 
 def probe_video_size(path: Path) -> tuple[int, int]:
+    info = probe_video_info(path)
+    return info["width"], info["height"]
+
+
+def probe_video_info(path: Path) -> dict[str, int | float]:
     command = [
         "ffprobe",
         "-hide_banner",
@@ -90,7 +187,7 @@ def probe_video_size(path: Path) -> tuple[int, int]:
         "-select_streams",
         "v:0",
         "-show_entries",
-        "stream=width,height",
+        "stream=width,height,nb_frames,avg_frame_rate,r_frame_rate,duration",
         "-of",
         "json",
         str(path),
@@ -102,7 +199,28 @@ def probe_video_size(path: Path) -> tuple[int, int]:
     height = int(stream.get("height") or 0)
     if width <= 0 or height <= 0:
         raise RuntimeError(f"Could not probe video size: {path}")
-    return width, height
+    fps = parse_frame_rate(stream.get("avg_frame_rate") or stream.get("r_frame_rate"))
+    frame_count = int(stream.get("nb_frames") or 0)
+    if frame_count <= 0:
+        duration = float(stream.get("duration") or 0.0)
+        frame_count = int(round(duration * fps)) if duration > 0 and fps > 0 else 0
+    if frame_count <= 0:
+        raise RuntimeError(f"Could not probe video frame count: {path}")
+    return {
+        "width": width,
+        "height": height,
+        "fps": fps,
+        "frame_count": frame_count,
+    }
+
+
+def parse_frame_rate(value) -> float:
+    text = str(value or "")
+    if "/" in text:
+        numerator, denominator = text.split("/", 1)
+        denominator_value = float(denominator or 0)
+        return float(numerator or 0) / denominator_value if denominator_value else 0.0
+    return float(text or 0.0)
 
 
 @contextmanager

@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from lite_annotator.video_decode import decode_video_frames
+from lite_annotator.video_decode import VideoFrameReader
 
 
 class VideoPlayer(QWidget):
@@ -22,7 +22,7 @@ class VideoPlayer(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.frames = []
+        self.reader: VideoFrameReader | None = None
         self.current_frame = 0
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.next_frame)
@@ -55,28 +55,30 @@ class VideoPlayer(QWidget):
 
     @property
     def frame_count(self) -> int:
-        return len(self.frames)
+        return self.reader.frame_count if self.reader else 0
 
     def load_video(self, path: str | Path) -> None:
-        frames = decode_video_frames(path)
+        if self.reader:
+            self.reader.close()
+        reader = VideoFrameReader(path)
 
         self.timer.stop()
         self.play_button.setText("Play")
-        self.frames = frames
+        self.reader = reader
         self.current_frame = 0
         self.slider.blockSignals(True)
-        self.slider.setRange(0, len(frames) - 1)
+        self.slider.setRange(0, self.frame_count - 1)
         self.slider.setValue(0)
         self.slider.blockSignals(False)
         self.show_frame(0)
-        self.video_loaded.emit(len(frames))
+        self.video_loaded.emit(self.frame_count)
 
     def show_frame(self, index: int) -> None:
-        if not self.frames:
+        if not self.reader:
             return
-        index = max(0, min(index, len(self.frames) - 1))
+        index = max(0, min(index, self.frame_count - 1))
         self.current_frame = index
-        frame = self.frames[index]
+        frame = self.reader.read(index)
         height, width, channels = frame.shape
         image = QImage(frame.data, width, height, channels * width, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(image).scaled(
@@ -85,7 +87,7 @@ class VideoPlayer(QWidget):
             Qt.SmoothTransformation,
         )
         self.image_label.setPixmap(pixmap)
-        self.frame_label.setText(f"Frame: {index + 1}/{len(self.frames)}")
+        self.frame_label.setText(f"Frame: {index + 1}/{self.frame_count}")
         self.slider.blockSignals(True)
         self.slider.setValue(index)
         self.slider.blockSignals(False)
@@ -95,9 +97,9 @@ class VideoPlayer(QWidget):
         self.show_frame(index)
 
     def next_frame(self) -> None:
-        if not self.frames:
+        if not self.reader:
             return
-        if self.current_frame >= len(self.frames) - 1:
+        if self.current_frame >= self.frame_count - 1:
             self.timer.stop()
             self.play_button.setText("Play")
             return
