@@ -274,6 +274,7 @@ class MainWindow(QMainWindow):
             self.segment_editor.set_segments([])
             self.segment_editor.set_scene_objects({})
             self.video_player.reset_episode()
+            self.video_player.set_subtasks([])
             self.video_text.clear()
             self.scene_form.blockSignals(True)
             try:
@@ -445,6 +446,7 @@ class MainWindow(QMainWindow):
             self.scene_form.load_robot_setup(self.annotation.get("robot_setup"))
             self.sync_phase_object_options()
             self.segment_editor.set_segments(self.annotation.get("subtasks") or [])
+            self.video_player.set_subtasks(self.current_subtasks())
             self.validation_messages.clear()
         finally:
             self.loading_episode = False
@@ -546,18 +548,21 @@ class MainWindow(QMainWindow):
         self.validation_messages.setText(f"Added segment skill: {item['text']}")
 
     def show_added_subtask_message(self, subtask):
+        self.video_player.set_subtasks(self.current_subtasks())
         self.video_player.set_current_subtask(subtask)
         self.update_scene_object_references()
         self.save_draft_annotation()
         self.validation_messages.setText(f"Added subtask annotation: {subtask['text']}")
 
     def show_updated_subtask_message(self, subtask):
+        self.video_player.set_subtasks(self.current_subtasks())
         self.video_player.set_current_subtask(subtask)
         self.update_scene_object_references()
         self.save_draft_annotation()
         self.validation_messages.setText(f"Updated subtask annotation: {subtask['text']}")
 
     def show_deleted_subtask_message(self, subtask):
+        self.video_player.set_subtasks(self.current_subtasks())
         self.video_player.set_current_subtask(None)
         self.update_scene_object_references()
         self.save_draft_annotation()
@@ -613,6 +618,12 @@ class MainWindow(QMainWindow):
         if self.current_episode is not None:
             annotation["episode"].update(self.build_episode_metadata(self.current_episode))
         return annotation
+
+    def current_subtasks(self):
+        return [
+            value for key, value in sorted(self.segment_editor.segments.items())
+            if isinstance(value, dict)
+        ]
 
     def save_draft_annotation(self):
         if self.loading_episode:

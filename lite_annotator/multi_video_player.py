@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtCore import QRectF, Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
@@ -19,6 +19,117 @@ from lite_annotator.ui_text import bilingual_label
 from lite_annotator.ui_theme import scaled
 from lite_annotator.video_decode import decode_video_frames
 from lite_annotator.vocabulary import option_label
+
+
+class SubtaskTimelineBar(QWidget):
+    COLORS = [
+        "#2f7d7d",
+        "#d47735",
+        "#5d7fc0",
+        "#7a62a8",
+        "#4f8b4f",
+        "#c0526d",
+        "#7d6a2f",
+        "#4d879c",
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.frame_count = 0
+        self.current_frame = 0
+        self.subtasks: list[dict] = []
+        self.setMinimumHeight(scaled(26))
+        self.setMaximumHeight(scaled(34))
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setToolTip(bilingual_label("subtask切分引导", "subtask segmentation guide"))
+
+    def set_frame_count(self, frame_count: int) -> None:
+        self.frame_count = max(int(frame_count or 0), 0)
+        self.update()
+
+    def set_current_frame(self, frame: int) -> None:
+        self.current_frame = max(0, int(frame or 0))
+        self.update()
+
+    def set_subtasks(self, subtasks) -> None:
+        self.subtasks = [
+            item for item in (subtasks or [])
+            if isinstance(item, dict)
+        ]
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        rect = self.rect().adjusted(scaled(2), scaled(4), -scaled(2), -scaled(4))
+        radius = scaled(5)
+
+        painter.setPen(QPen(QColor("#b7c3c8"), 1))
+        painter.setBrush(QColor("#e6ecee"))
+        painter.drawRoundedRect(rect, radius, radius)
+
+        if self.frame_count <= 0:
+            self.draw_center_text(painter, rect, bilingual_label("未加载视频", "no video"))
+            return
+
+        sorted_subtasks = sorted(
+            self.valid_subtasks(),
+            key=lambda item: item[0],
+        )
+        last_end = -1
+        for index, (start, end) in enumerate(sorted_subtasks, start=1):
+            start = max(0, min(start, self.frame_count - 1))
+            end = max(0, min(end, self.frame_count - 1))
+            if end < start:
+                start, end = end, start
+            if start <= last_end:
+                color = QColor("#c0392b")
+            else:
+                color = QColor(self.COLORS[(index - 1) % len(self.COLORS)])
+
+            segment_rect = self.segment_rect(rect, start, end)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(color)
+            painter.drawRoundedRect(segment_rect, scaled(3), scaled(3))
+            if segment_rect.width() >= scaled(20):
+                painter.setPen(QColor("#ffffff"))
+                font = QFont(painter.font())
+                font.setBold(True)
+                font.setPointSizeF(max(7.0, font.pointSizeF() - 1))
+                painter.setFont(font)
+                painter.drawText(segment_rect, Qt.AlignCenter, str(index))
+            last_end = max(last_end, end)
+
+        self.draw_current_frame_marker(painter, rect)
+
+    def valid_subtasks(self) -> list[tuple[int, int]]:
+        ranges = []
+        for subtask in self.subtasks:
+            try:
+                start = int(subtask.get("start_frame", 0))
+                end = int(subtask.get("end_frame", start))
+            except (TypeError, ValueError):
+                continue
+            ranges.append((start, end))
+        return ranges
+
+    def segment_rect(self, rect, start: int, end: int) -> QRectF:
+        max_frame = max(self.frame_count - 1, 1)
+        x1 = rect.left() + rect.width() * (start / max_frame)
+        x2 = rect.left() + rect.width() * (end / max_frame)
+        min_width = scaled(3)
+        return QRectF(x1, rect.top(), max(x2 - x1, min_width), rect.height())
+
+    def draw_current_frame_marker(self, painter, rect) -> None:
+        max_frame = max(self.frame_count - 1, 1)
+        frame = max(0, min(self.current_frame, self.frame_count - 1))
+        x = rect.left() + rect.width() * (frame / max_frame)
+        painter.setPen(QPen(QColor("#111827"), scaled(2)))
+        painter.drawLine(int(x), rect.top() - scaled(3), int(x), rect.bottom() + scaled(3))
+
+    def draw_center_text(self, painter, rect, text: str) -> None:
+        painter.setPen(QColor("#66727a"))
+        painter.drawText(rect, Qt.AlignCenter, text)
 
 
 class MultiCameraVideoPlayer(QWidget):
@@ -45,6 +156,7 @@ class MultiCameraVideoPlayer(QWidget):
         self.frame_label = QLabel(f"{bilingual_label('帧', 'frame')}: -/-")
         self.slider = QSlider(Qt.Horizontal)
         self.slider.valueChanged.connect(self.seek)
+        self.subtask_timeline = SubtaskTimelineBar(self)
 
         self.play_button = QPushButton(bilingual_label("播放", "play"))
         self.play_button.clicked.connect(self.toggle_playback)
@@ -78,6 +190,7 @@ class MultiCameraVideoPlayer(QWidget):
         video_column_layout.setContentsMargins(0, 0, 0, 0)
         video_column_layout.addLayout(self.video_grid)
         video_column_layout.addWidget(self.slider)
+        video_column_layout.addWidget(self.subtask_timeline)
         video_column_layout.addLayout(controls)
         video_column_layout.addWidget(self.info_panel)
 
@@ -110,6 +223,9 @@ class MultiCameraVideoPlayer(QWidget):
         self.slider.setValue(0)
         self.slider.blockSignals(False)
         self.frame_label.setText(f"{bilingual_label('帧', 'frame')}: -/-")
+        self.subtask_timeline.set_frame_count(0)
+        self.subtask_timeline.set_current_frame(0)
+        self.subtask_timeline.set_subtasks([])
         self.play_button.setText(bilingual_label("播放", "play"))
         self.set_placeholder()
 
@@ -140,6 +256,9 @@ class MultiCameraVideoPlayer(QWidget):
         self.slider.setRange(0, self.frame_count - 1)
         self.slider.setValue(0)
         self.slider.blockSignals(False)
+        self.subtask_timeline.set_frame_count(self.frame_count)
+        self.subtask_timeline.set_current_frame(0)
+        self.subtask_timeline.set_subtasks([])
         self.show_frame_after_layout()
         self.set_current_subtask(None)
         self.episode_loaded.emit(self.frame_count)
@@ -199,6 +318,9 @@ class MultiCameraVideoPlayer(QWidget):
         self.current_subtask = subtask
         self.refresh_current_subtask_label()
 
+    def set_subtasks(self, subtasks) -> None:
+        self.subtask_timeline.set_subtasks(subtasks)
+
     def set_display_label_maps(self, object_options=None, action_options=None) -> None:
         self.object_display_labels = dict(object_options or {})
         self.action_display_labels = dict(action_options or {})
@@ -253,6 +375,7 @@ class MultiCameraVideoPlayer(QWidget):
             )
             label.setPixmap(pixmap)
         self.frame_label.setText(f"{bilingual_label('帧', 'frame')}: {index}/{self.frame_count - 1}")
+        self.subtask_timeline.set_current_frame(index)
         self.slider.blockSignals(True)
         self.slider.setValue(index)
         self.slider.blockSignals(False)
