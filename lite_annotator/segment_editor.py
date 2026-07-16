@@ -47,6 +47,8 @@ class PhaseDialog(QDialog):
         phases=None,
         allowed_actions=None,
         action_targets=None,
+        subtask_start_frame=None,
+        subtask_end_frame=None,
         parent=None,
     ):
         super().__init__(parent)
@@ -54,17 +56,21 @@ class PhaseDialog(QDialog):
         self.phases = list(phases or [])
         self.allowed_actions = set(allowed_actions or [])
         self.action_targets = list(action_targets or [("primary", "主动作(primary)")])
-        max_frame = max(int(frame_count) - 1, 0)
-        current_frame = max(0, min(int(current_frame), max_frame))
+        self.subtask_start_frame = subtask_start_frame
+        self.subtask_end_frame = subtask_end_frame
+        frame_count = max(int(frame_count), 0)
+        max_start_frame = max(frame_count - 1, 0)
+        max_end_frame = max(frame_count, 0)
+        current_frame = max(0, min(int(current_frame), max_start_frame))
 
         self.phase_list_widget = QListWidget()
         self.phase_list_widget.currentItemChanged.connect(self.load_selected_phase)
         self.start_frame_input = QSpinBox()
-        self.start_frame_input.setRange(0, max_frame)
+        self.start_frame_input.setRange(0, max_start_frame)
         self.start_frame_input.setValue(current_frame)
         self.end_frame_input = QSpinBox()
-        self.end_frame_input.setRange(0, max_frame)
-        self.end_frame_input.setValue(current_frame)
+        self.end_frame_input.setRange(0, max_end_frame)
+        self.end_frame_input.setValue(min(current_frame + 1, max_end_frame))
         self.action_select = QComboBox()
         for value, label in load_phase_actions():
             if self.allowed_actions and value not in self.allowed_actions:
@@ -85,7 +91,7 @@ class PhaseDialog(QDialog):
 
         form = QFormLayout()
         form.addRow(bilingual_label("起始帧", "start frame"), self.start_frame_input)
-        form.addRow(bilingual_label("结束帧", "end frame"), self.end_frame_input)
+        form.addRow(bilingual_label("结束帧(不含)", "end frame exclusive"), self.end_frame_input)
         form.addRow(bilingual_label("动作", "action"), self.action_select)
         form.addRow(bilingual_label("物品", "object"), self.object_select)
         form.addRow(bilingual_label("所属动作", "action owner"), self.target_action_select)
@@ -102,6 +108,16 @@ class PhaseDialog(QDialog):
         buttons.rejected.connect(self.reject)
 
         layout = QVBoxLayout(self)
+        if self.subtask_start_frame is not None:
+            start_text = str(int(self.subtask_start_frame))
+            if self.subtask_end_frame is None:
+                hint = f"当前subtask起始帧: {start_text}"
+            else:
+                hint = (
+                    f"当前subtask范围: {int(self.subtask_start_frame)}:"
+                    f"{int(self.subtask_end_frame)}，起始帧: {start_text}"
+                )
+            layout.addWidget(QLabel(hint))
         layout.addWidget(self.phase_list_widget)
         layout.addLayout(form)
         layout.addLayout(phase_buttons)
@@ -111,7 +127,6 @@ class PhaseDialog(QDialog):
     def build_phase(self):
         start = int(self.start_frame_input.value())
         end = int(self.end_frame_input.value())
-        start, end = min(start, end), max(start, end)
         return {
             "start_frame": start,
             "end_frame": end,
@@ -124,7 +139,7 @@ class PhaseDialog(QDialog):
         self.phase_list_widget.clear()
         for index, phase in enumerate(self.phases, start=1):
             item = QListWidgetItem(
-                f"{index}. {int(phase['start_frame'])}-{int(phase['end_frame'])}  "
+                f"{index}. {int(phase['start_frame'])}:{int(phase['end_frame'])}  "
                 f"{phase.get('target_action', 'primary')}  "
                 f"{phase.get('action', '')}  {phase.get('object', '')}"
             )
@@ -222,7 +237,7 @@ class SegmentEditor(QWidget):
 
         form = QFormLayout()
         form.addRow(bilingual_label("起始帧", "start frame"), self.start_frame_input)
-        form.addRow(bilingual_label("结束帧", "end frame"), self.end_frame_input)
+        form.addRow(bilingual_label("结束帧(不含)", "end frame exclusive"), self.end_frame_input)
         form.addRow(bilingual_label("状态", "state"), self.state_select)
         form.addRow(bilingual_label("片段技能", "segment skill"), self.skill_select)
 
@@ -251,7 +266,7 @@ class SegmentEditor(QWidget):
     def set_frame_count(self, frame_count):
         max_frame = max(int(frame_count) - 1, 0)
         self.start_frame_input.setRange(0, max_frame)
-        self.end_frame_input.setRange(0, max_frame)
+        self.end_frame_input.setRange(0, max_frame + 1)
         self.set_current_frame(min(self.current_frame, max_frame))
 
     def set_current_frame(self, frame):
@@ -265,7 +280,9 @@ class SegmentEditor(QWidget):
         self.start_frame_input.setValue(self.current_frame)
 
     def set_end_to_current_frame(self):
-        self.end_frame_input.setValue(self.current_frame)
+        self.end_frame_input.setValue(
+            min(self.current_frame + 1, self.end_frame_input.maximum())
+        )
 
     def set_scene_objects(self, object_options):
         self.scene_object_options = dict(object_options or {})
@@ -302,7 +319,6 @@ class SegmentEditor(QWidget):
         template = deepcopy(item.get("template") or {})
         start = int(self.start_frame_input.value())
         end = int(self.end_frame_input.value())
-        start, end = min(start, end), max(start, end)
         return {
             "start_frame": start,
             "end_frame": end,
@@ -376,12 +392,14 @@ class SegmentEditor(QWidget):
         if not isinstance(subtask, dict):
             return
         dialog = PhaseDialog(
-            frame_count=self.start_frame_input.maximum() + 1,
+            frame_count=self.end_frame_input.maximum(),
             current_frame=self.current_frame,
             object_options=self.scene_object_options,
             phases=subtask.get("phases") or [],
             allowed_actions=self.allowed_phase_actions_for_subtask(subtask),
             action_targets=self.action_targets_for_subtask(subtask),
+            subtask_start_frame=int(subtask.get("start_frame", key[0])),
+            subtask_end_frame=int(subtask.get("end_frame", key[1])),
             parent=self,
         )
         if dialog.exec_() != QDialog.Accepted:
@@ -416,7 +434,7 @@ class SegmentEditor(QWidget):
             text = ""
             if isinstance(subtask, dict):
                 text = subtask.get("text", "")
-            item = QListWidgetItem(f"{index}. {key[0]}-{key[1]}  {text}")
+            item = QListWidgetItem(f"{index}. {key[0]}:{key[1]}  {text}")
             item.setData(Qt.UserRole, key)
             self.list_widget.addItem(item)
             if key == selected_key:

@@ -79,10 +79,10 @@ class SubtaskTimelineBar(QWidget):
         last_end = -1
         for index, (start, end) in enumerate(sorted_subtasks, start=1):
             start = max(0, min(start, self.frame_count - 1))
-            end = max(0, min(end, self.frame_count - 1))
+            end = max(0, min(end, self.frame_count))
             if end < start:
                 start, end = end, start
-            if start <= last_end:
+            if start < last_end:
                 color = QColor("#c0392b")
             else:
                 color = QColor(self.COLORS[(index - 1) % len(self.COLORS)])
@@ -114,9 +114,9 @@ class SubtaskTimelineBar(QWidget):
         return ranges
 
     def segment_rect(self, rect, start: int, end: int) -> QRectF:
-        max_frame = max(self.frame_count - 1, 1)
-        x1 = rect.left() + rect.width() * (start / max_frame)
-        x2 = rect.left() + rect.width() * (end / max_frame)
+        max_boundary = max(self.frame_count, 1)
+        x1 = rect.left() + rect.width() * (start / max_boundary)
+        x2 = rect.left() + rect.width() * (end / max_boundary)
         min_width = scaled(3)
         return QRectF(x1, rect.top(), max(x2 - x1, min_width), rect.height())
 

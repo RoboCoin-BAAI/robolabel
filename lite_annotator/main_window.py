@@ -49,7 +49,14 @@ from lite_annotator.multi_video_player import MultiCameraVideoPlayer
 from lite_annotator.scene_form import SceneForm
 from lite_annotator.segment_editor import load_phase_actions
 from lite_annotator.segment_editor import SegmentEditor
-from lite_annotator.standard_export import to_standard_annotation
+from lite_annotator.standard_export import (
+    annotation_from_standard_episode,
+    find_standard_episode,
+    read_standard_task_file,
+    standard_annotation_path,
+    standard_episode_is_annotated,
+    to_standard_task_annotation,
+)
 from lite_annotator.skill_library import (
     add_skill_template,
     delete_skill_template,
@@ -336,11 +343,23 @@ class MainWindow(QMainWindow):
         annotation_file = self.active_annotation_file()
         if annotation_file:
             annotated_keys = set(load_annotated_episode_keys(annotation_file))
+        standard_annotation = {}
+        if self.dataset_root:
+            standard_annotation = read_standard_task_file(standard_annotation_path(self.dataset_root))
         for episode in self.episodes:
+            standard_episode = find_standard_episode(
+                standard_annotation,
+                episode,
+                episode.camera_videos.get(self.main_camera) or episode.primary_video_path,
+            ) if standard_annotation else None
+            annotated = (
+                episode.annotation_stem in annotated_keys
+                or standard_episode_is_annotated(standard_episode)
+            )
             row = self.video_list.rowCount()
             self.video_list.insertRow(row)
             status_item = QTableWidgetItem(
-                self.episode_status_text(episode.annotation_stem in annotated_keys)
+                self.episode_status_text(annotated)
             )
             episode_item = QTableWidgetItem(episode.display_name)
             status_item.setData(Qt.UserRole, episode)
@@ -380,13 +399,25 @@ class MainWindow(QMainWindow):
             return
         annotation_file = self.active_annotation_file()
         annotated_keys = set(load_annotated_episode_keys(annotation_file)) if annotation_file else set()
+        standard_episode = None
+        if self.dataset_root:
+            standard_annotation = read_standard_task_file(standard_annotation_path(self.dataset_root))
+            if standard_annotation:
+                standard_episode = find_standard_episode(
+                    standard_annotation,
+                    self.current_episode,
+                    self.current_video_path,
+                )
         status_item = self.video_list.item(row, 0)
         if status_item is None:
             status_item = QTableWidgetItem()
             status_item.setData(Qt.UserRole, self.current_episode)
             self.video_list.setItem(row, 0, status_item)
         status_item.setText(
-            self.episode_status_text(self.current_episode.annotation_stem in annotated_keys)
+            self.episode_status_text(
+                self.current_episode.annotation_stem in annotated_keys
+                or standard_episode_is_annotated(standard_episode)
+            )
         )
 
     def load_selected_episode(self, current_row, current_column, previous_row, previous_column):
@@ -400,6 +431,20 @@ class MainWindow(QMainWindow):
             bundle_annotation = load_annotation_from_bundle(bundle_path, annotation_stem)
             if bundle_annotation:
                 return bundle_annotation
+        if self.dataset_root and self.current_episode:
+            standard_path = standard_annotation_path(self.dataset_root)
+            standard_annotation = read_standard_task_file(standard_path)
+            standard_episode = find_standard_episode(
+                standard_annotation,
+                self.current_episode,
+                self.current_video_path,
+            ) if standard_annotation else None
+            if standard_episode:
+                return annotation_from_standard_episode(
+                    standard_annotation,
+                    standard_episode,
+                    self.build_episode_metadata(self.current_episode),
+                )
         return None
 
     def apply_shared_task_fields(self, annotation):
@@ -471,7 +516,11 @@ class MainWindow(QMainWindow):
         subtask = self.segment_editor.segments.get(key)
         if isinstance(subtask, dict):
             self.video_player.set_current_subtask(subtask)
-            self.video_player.seek(int(subtask.get("start_frame", key[0])))
+            tail_frame = max(
+                int(subtask.get("start_frame", key[0])),
+                int(subtask.get("end_frame", key[1])) - 1,
+            )
+            self.video_player.seek(tail_frame)
             self.validation_messages.setText(subtask.get("text", ""))
 
     def sync_phase_object_options(self):
@@ -703,13 +752,21 @@ class MainWindow(QMainWindow):
             return
         annotation_stem = self.active_annotation_stem()
         self.persist_annotation(annotation_file, annotation_stem, annotation)
-        export_path = annotation_file.parent / f"{annotation_stem}_standard.json"
+        bundle = load_annotation_bundle(annotation_file)
+        export_path = standard_annotation_path(self.dataset_root)
+        existing_standard = read_standard_task_file(export_path)
         export_path.parent.mkdir(parents=True, exist_ok=True)
-        standard_annotation = to_standard_annotation(
-            annotation,
+        primary_video_paths = {
+            episode.annotation_stem: str(episode.camera_videos.get(self.main_camera) or episode.primary_video_path)
+            for episode in self.episodes
+        }
+        standard_annotation = to_standard_task_annotation(
+            bundle,
             dataset_type=self.dataset_type,
-            data_path=self.current_video_path,
             dataset_root=self.dataset_root,
+            primary_video_paths=primary_video_paths,
+            episode_order=[episode.annotation_stem for episode in self.episodes],
+            existing_standard=existing_standard,
         )
         export_path.write_text(
             json.dumps(standard_annotation, ensure_ascii=False, indent=2),

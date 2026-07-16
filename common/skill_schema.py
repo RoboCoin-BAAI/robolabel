@@ -741,8 +741,8 @@ def validate_subtask(subtask, skill_templates, coordination_modes, prefix="subta
         end_frame = int(subtask["end_frame"])
     except (TypeError, ValueError):
         return f"{prefix} start_frame/end_frame 必须是整数"
-    if start_frame > end_frame:
-        return f"{prefix} start_frame 必须小于等于 end_frame"
+    if start_frame >= end_frame:
+        return f"{prefix} start_frame 必须小于 end_frame"
 
     coordination_mode = subtask.get("coordination_mode")
     if coordination_mode not in coordination_modes:
@@ -790,7 +790,7 @@ def validate_subtask(subtask, skill_templates, coordination_modes, prefix="subta
         for phase_action in skill_config.get("allowed_phase_actions") or []:
             if phase_action not in allowed_phase_actions:
                 allowed_phase_actions.append(phase_action)
-    previous_phase_end = start_frame - 1
+    previous_phase_end = None
     for phase_idx, phase in enumerate(phases):
         phase_prefix = f"{prefix}.phases[{phase_idx}]"
         if not isinstance(phase, dict):
@@ -808,14 +808,14 @@ def validate_subtask(subtask, skill_templates, coordination_modes, prefix="subta
             return f"{phase_prefix} start_frame/end_frame 必须是整数"
         if phase_start < start_frame or phase_end > end_frame:
             return f"{phase_prefix} 必须在 subtask 帧范围内"
-        if phase_start > phase_end:
-            return f"{phase_prefix} start_frame 必须小于等于 end_frame"
+        if phase_start >= phase_end:
+            return f"{phase_prefix} start_frame 必须小于 end_frame"
         if phase_idx == 0 and phase_start != start_frame:
             return f"{phase_prefix} 必须从 subtask 起始帧 {start_frame} 开始"
-        if phase_start <= previous_phase_end:
+        if previous_phase_end is not None and phase_start < previous_phase_end:
             return f"{phase_prefix} 与前一个 phase 重叠或顺序错误"
-        if phase_start != previous_phase_end + 1:
-            return f"{phase_prefix} 必须从上一 phase 结束帧+1 开始"
+        if previous_phase_end is not None and phase_start != previous_phase_end:
+            return f"{phase_prefix} 必须从上一 phase 结束帧开始"
         previous_phase_end = phase_end
         if phase.get("action") not in PHASE_ACTION_ALLOWED_VALUES:
             return f"{phase_prefix} action 必须属于 {sorted(PHASE_ACTION_ALLOWED_VALUES)}"
@@ -1017,9 +1017,9 @@ def validate_annotation(annotation, skill_templates=None, coordination_modes=Non
         end_frame = int(subtask["end_frame"])
         if expected_start is not None and start_frame != expected_start:
             return (
-                f"subtasks 不连续：上一段结束后应从第{expected_start + 1}帧开始，"
-                f"但下一段从第{start_frame + 1}帧开始"
+                f"subtasks 不连续：上一段结束后应从第{expected_start}帧开始，"
+                f"但下一段从第{start_frame}帧开始"
             )
-        expected_start = end_frame + 1
+        expected_start = end_frame
 
     return None

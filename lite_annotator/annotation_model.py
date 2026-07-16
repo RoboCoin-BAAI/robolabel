@@ -62,31 +62,35 @@ def validate_lite_annotation(annotation: dict[str, Any], frame_count: int = 0) -
     if not subtasks:
         errors.append("至少需要一个片段")
 
-    previous_end = -1
+    previous_end = None
     for idx, subtask in enumerate(subtasks):
         start_frame = int(subtask.get("start_frame", -1))
         end_frame = int(subtask.get("end_frame", -1))
         if start_frame < 0 or end_frame < 0:
             errors.append(f"片段{idx + 1}帧范围不能为空")
-        if start_frame > end_frame:
-            errors.append(f"片段{idx + 1}开始帧不能大于结束帧")
-        if frame_count and end_frame >= frame_count:
+        if start_frame >= end_frame:
+            errors.append(f"片段{idx + 1}开始帧必须小于结束帧")
+        if frame_count and end_frame > frame_count:
             errors.append(f"片段{idx + 1}结束帧超出视频范围")
-        expected_start = 0 if idx == 0 else previous_end + 1
+        expected_start = 0 if idx == 0 else previous_end
         if idx == 0 and start_frame != 0:
             errors.append("第1个subtask必须从第0帧开始")
         elif idx > 0 and start_frame != expected_start:
             errors.append(
-                f"第{idx + 1}个subtask必须从上一段结束帧+1开始，"
+                f"第{idx + 1}个subtask必须从上一段结束帧开始，"
                 f"应为{expected_start}，实际为{start_frame}"
             )
         phases = subtask.get("phases") or []
         if phases:
-            previous_phase_end = start_frame - 1
+            previous_phase_end = None
             for phase_idx, phase in enumerate(phases):
                 phase_start = int(phase.get("start_frame", -1))
                 phase_end = int(phase.get("end_frame", -1))
-                expected_phase_start = start_frame if phase_idx == 0 else previous_phase_end + 1
+                expected_phase_start = start_frame if phase_idx == 0 else previous_phase_end
+                if phase_start < start_frame or phase_end > end_frame:
+                    errors.append(f"第{idx + 1}个subtask的第{phase_idx + 1}个phase必须在subtask帧范围内")
+                if phase_start >= phase_end:
+                    errors.append(f"第{idx + 1}个subtask的第{phase_idx + 1}个phase开始帧必须小于结束帧")
                 if phase_idx == 0 and phase_start != start_frame:
                     errors.append(
                         f"第{idx + 1}个subtask的第1个phase必须从subtask起始帧{start_frame}开始，"
@@ -94,7 +98,7 @@ def validate_lite_annotation(annotation: dict[str, Any], frame_count: int = 0) -
                     )
                 elif phase_idx > 0 and phase_start != expected_phase_start:
                     errors.append(
-                        f"第{idx + 1}个subtask的第{phase_idx + 1}个phase必须从上一phase结束帧+1开始，"
+                        f"第{idx + 1}个subtask的第{phase_idx + 1}个phase必须从上一phase结束帧开始，"
                         f"应为{expected_phase_start}，实际为{phase_start}"
                     )
                 previous_phase_end = phase_end
@@ -104,8 +108,8 @@ def validate_lite_annotation(annotation: dict[str, Any], frame_count: int = 0) -
                     f"实际为{previous_phase_end}"
                 )
         previous_end = end_frame
-    if subtasks and frame_count and previous_end != frame_count - 1:
-        errors.append(f"最后一个subtask必须结束于视频尾帧{frame_count - 1}，实际为{previous_end}")
+    if subtasks and frame_count and previous_end != frame_count:
+        errors.append(f"最后一个subtask必须结束于视频尾帧后一帧{frame_count}，实际为{previous_end}")
 
     try:
         _, skill_templates = load_skill_templates()
