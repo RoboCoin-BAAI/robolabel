@@ -193,6 +193,7 @@ class SegmentEditor(QWidget):
         super().__init__(parent)
         self.segments = {}
         self.get_current_frame = lambda: 0
+        self.has_bound_frame_source = False
         self.current_frame = 0
         self.skill_items = []
         self.scene_object_options = {}
@@ -262,6 +263,7 @@ class SegmentEditor(QWidget):
 
     def bind_frame_source(self, get_current_frame):
         self.get_current_frame = get_current_frame
+        self.has_bound_frame_source = True
 
     def set_frame_count(self, frame_count):
         max_frame = max(int(frame_count) - 1, 0)
@@ -276,10 +278,20 @@ class SegmentEditor(QWidget):
             f"{bilingual_label('当前帧', 'current frame')}: {self.current_frame}"
         )
 
+    def sync_current_frame_from_source(self):
+        if not self.has_bound_frame_source:
+            return
+        try:
+            self.set_current_frame(self.get_current_frame())
+        except Exception:
+            pass
+
     def set_start_to_current_frame(self):
+        self.sync_current_frame_from_source()
         self.start_frame_input.setValue(self.current_frame)
 
     def set_end_to_current_frame(self):
+        self.sync_current_frame_from_source()
         self.end_frame_input.setValue(
             min(self.current_frame + 1, self.end_frame_input.maximum())
         )

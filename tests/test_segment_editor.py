@@ -39,6 +39,18 @@ def test_set_end_to_current_frame_clamps_to_frame_count_boundary():
     assert editor.end_frame_input.value() == 406
 
 
+def test_set_start_to_current_frame_reads_latest_bound_frame_source():
+    app()
+    editor = SegmentEditor()
+    editor.set_frame_count(100)
+    editor.set_current_frame(41)
+    editor.bind_frame_source(lambda: 42)
+
+    editor.set_start_to_current_frame()
+
+    assert editor.start_frame_input.value() == 42
+
+
 def test_phase_dialog_shows_subtask_start_frame_hint():
     app()
 
