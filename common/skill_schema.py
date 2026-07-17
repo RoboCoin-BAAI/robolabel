@@ -15,7 +15,7 @@ DEFAULT_COORDINATION_MODE_PATH = os.path.join(ROOT_DIR, "config", "coordination_
 DEFAULT_SCENE_TEMPLATE_PATH = os.path.join(ROOT_DIR, "config", "scene_templates.yaml")
 
 ACTION_ALLOWED_KEYS = {"subject", "skill", "slots", "text"}
-PHASE_ALLOWED_KEYS = {"start_frame", "end_frame", "action", "object", "target_action"}
+PHASE_ALLOWED_KEYS = {"start_frame", "end_frame", "action", "object", "target_action", "prediction_meta"}
 PHASE_REQUIRED_KEYS = {"start_frame", "end_frame", "action", "object"}
 PHASE_ACTION_ALLOWED_VALUES = {
     "approach",
@@ -53,8 +53,11 @@ SUBTASK_ALLOWED_KEYS = {
     "actions",
     "text",
     "phases",
+    "prediction_meta",
+    "_standard_subtask_entry",
 }
-SUBTASK_REQUIRED_KEYS = SUBTASK_ALLOWED_KEYS - {"phases", "state"}
+SUBTASK_OPTIONAL_KEYS = {"skill_id", "phases", "state", "prediction_meta", "_standard_subtask_entry"}
+SUBTASK_REQUIRED_KEYS = SUBTASK_ALLOWED_KEYS - SUBTASK_OPTIONAL_KEYS
 ROBOT_EMBODIMENT_ALLOWED_VALUES = ["single_arm", "dual_arm"]
 ROBOT_SETUP_ALLOWED_KEYS = {
     "embodiment",
@@ -89,7 +92,10 @@ ANNOTATION_ALLOWED_KEYS = {
     "video_text",
     "scene",
     "subtasks",
+    "annotation_meta",
+    "_standard_episode_entry",
 }
+ANNOTATION_OPTIONAL_KEYS = {"annotation_meta", "_standard_episode_entry"}
 
 EFFECTOR_TYPE_ALLOWED_VALUES = [
     "two_finger",
@@ -970,7 +976,7 @@ def validate_annotation(annotation, skill_templates=None, coordination_modes=Non
     unknown_keys = set(annotation) - ANNOTATION_ALLOWED_KEYS
     if unknown_keys:
         return f"顶层出现未知字段: {sorted(unknown_keys)}"
-    missing_keys = ANNOTATION_ALLOWED_KEYS - set(annotation)
+    missing_keys = (ANNOTATION_ALLOWED_KEYS - ANNOTATION_OPTIONAL_KEYS) - set(annotation)
     if missing_keys:
         return f"顶层缺少字段: {sorted(missing_keys)}"
 

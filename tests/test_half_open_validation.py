@@ -97,6 +97,51 @@ def test_lite_validation_accepts_contiguous_half_open_subtasks_and_phases():
     assert validate_annotation(annotation) is None
 
 
+def test_schema_validation_accepts_optional_annotation_meta():
+    annotation = make_annotation([make_subtask(0, 20)], frame_count=20)
+    annotation["annotation_meta"] = {"source": "automatic"}
+
+    assert validate_lite_annotation(annotation, frame_count=20) == []
+    assert validate_annotation(annotation) is None
+
+
+def test_schema_validation_accepts_hidden_standard_metadata_for_loaded_auto_annotations():
+    annotation = make_annotation(
+        [
+            make_subtask(
+                0,
+                20,
+                phases=[
+                    {
+                        "start_frame": 0,
+                        "end_frame": 20,
+                        "action": "approach",
+                        "object": "object",
+                        "target_action": "primary",
+                        "prediction_meta": {"alignment_score": 0.8},
+                    }
+                ],
+            )
+        ],
+        frame_count=20,
+    )
+    annotation["_standard_episode_entry"] = {"episode_prediction_meta": {"keep": True}}
+    annotation["subtasks"][0]["prediction_meta"] = {"alignment_score": 0.9}
+    annotation["subtasks"][0]["_standard_subtask_entry"] = {"review_flags": ["keep"]}
+
+    assert validate_lite_annotation(annotation, frame_count=20) == []
+    assert validate_annotation(annotation) is None
+
+
+def test_schema_validation_accepts_standard_subtasks_without_skill_id():
+    subtask = make_subtask(0, 20)
+    subtask.pop("skill_id")
+    annotation = make_annotation([subtask], frame_count=20)
+
+    assert validate_lite_annotation(annotation, frame_count=20) == []
+    assert validate_annotation(annotation) is None
+
+
 def test_lite_validation_rejects_gap_between_half_open_subtasks():
     annotation = make_annotation([make_subtask(0, 10), make_subtask(11, 20)], frame_count=20)
 

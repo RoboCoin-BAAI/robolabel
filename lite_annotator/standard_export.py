@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import re
 from pathlib import Path
@@ -186,13 +187,18 @@ def standard_robot_setup(robot_setup: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def standard_phase_list(phases, target_action: str) -> list[dict[str, Any]]:
+def standard_phase_list(phases, target_action: str, base_phases=None) -> list[dict[str, Any]]:
     result = []
+    base_phases = [
+        phase for phase in (base_phases or [])
+        if isinstance(phase, dict)
+    ]
     for phase in phases or []:
         if not isinstance(phase, dict):
             continue
         if str(phase.get("target_action", "primary") or "primary") != target_action:
             continue
+        base = copy.deepcopy(base_phases[len(result)]) if len(result) < len(base_phases) else {}
         item = {
             "id": len(result),
             "start_frame": int(phase.get("start_frame", 0)),
@@ -203,18 +209,22 @@ def standard_phase_list(phases, target_action: str) -> list[dict[str, Any]]:
         prediction_meta = phase.get("phases_prediction_meta") or phase.get("prediction_meta")
         if isinstance(prediction_meta, dict):
             item["phases_prediction_meta"] = prediction_meta
+        base.update(item)
+        item = base
         result.append(item)
     return result
 
 
-def standard_action(action: dict[str, Any], phases, target_action: str) -> dict[str, Any]:
-    return {
+def standard_action(action: dict[str, Any], phases, target_action: str, base_action=None) -> dict[str, Any]:
+    result = copy.deepcopy(base_action) if isinstance(base_action, dict) else {}
+    result.update({
         "subject": str(action.get("subject", "")),
         "skill": str(action.get("skill", "")),
         "text": str(action.get("text", "")),
         "slots": dict(action.get("slots") or {}),
-        "phases": standard_phase_list(phases, target_action),
-    }
+        "phases": standard_phase_list(phases, target_action, result.get("phases")),
+    })
+    return result
 
 
 def subtask_description(actions: list[dict[str, Any]]) -> str:
@@ -233,20 +243,23 @@ def standard_subtask(subtask: dict[str, Any]) -> dict[str, Any]:
         if isinstance(action, dict)
     ]
     phases = subtask.get("phases") or []
-    result = {
+    result = copy.deepcopy(subtask.get("_standard_subtask_entry")) if isinstance(subtask.get("_standard_subtask_entry"), dict) else {}
+    result.update({
         "id": 0,
         "start_frame": int(subtask.get("start_frame", 0)),
         "end_frame": int(subtask.get("end_frame", 0)),
         "state": str(subtask.get("state", "normal") or "normal"),
         "coordination_mode": str(subtask.get("coordination_mode", "")),
         "description": subtask_description(actions),
-        "primary_action": standard_action(actions[0], phases, "primary") if actions else None,
-    }
+        "primary_action": standard_action(actions[0], phases, "primary", result.get("primary_action")) if actions else None,
+    })
     prediction_meta = subtask.get("subtask_prediction_meta") or subtask.get("prediction_meta")
     if isinstance(prediction_meta, dict):
         result["subtask_prediction_meta"] = prediction_meta
     if len(actions) > 1:
-        result["auxiliary_action"] = standard_action(actions[1], phases, "auxiliary")
+        result["auxiliary_action"] = standard_action(actions[1], phases, "auxiliary", result.get("auxiliary_action"))
+    elif "auxiliary_action" in result:
+        result.pop("auxiliary_action")
     return result
 
 
@@ -267,13 +280,32 @@ def standard_episode_annotation(
     annotation_meta = annotation.get("annotation_meta")
     if not isinstance(annotation_meta, dict):
         annotation_meta = {"source": "human"}
-    return {
+    result = copy.deepcopy(annotation.get("_standard_episode_entry")) if isinstance(annotation.get("_standard_episode_entry"), dict) else {}
+    result.update({
         "id": episode_id,
         "episode_video_path": video_path,
         "frame_count": int(episode.get("frames", 0)),
         "annotation_meta": annotation_meta,
         "subtasks": subtasks,
-    }
+    })
+    return result
+
+
+def renumber_standard_episode(item: dict[str, Any], episode_id: int) -> dict[str, Any]:
+    result = copy.deepcopy(item)
+    result["id"] = episode_id
+    for subtask_index, subtask in enumerate(result.get("subtasks") or []):
+        if not isinstance(subtask, dict):
+            continue
+        subtask["id"] = subtask_index
+        for action_key in ("primary_action", "auxiliary_action"):
+            action = subtask.get(action_key)
+            if not isinstance(action, dict):
+                continue
+            for phase_index, phase in enumerate(action.get("phases") or []):
+                if isinstance(phase, dict):
+                    phase["id"] = phase_index
+    return result
 
 
 def to_standard_task_annotation(
@@ -304,49 +336,68 @@ def to_standard_task_annotation(
         or representative_episode.get("video_path")
         or ""
     )
-    episode_annotations = []
+    replacement_episodes = []
     for key in ordered_keys:
         annotation = annotations.get(key)
         if not isinstance(annotation, dict):
             continue
         if not annotation.get("subtasks"):
             continue
-        episode_annotations.append(
-            standard_episode_annotation(
-                annotation,
-                len(episode_annotations),
-                primary_video_paths.get(key),
-            )
+        episode_item = standard_episode_annotation(
+            annotation,
+            len(replacement_episodes),
+            primary_video_paths.get(key),
         )
-    seen_episode_paths = {
-        str(item.get("episode_video_path", ""))
-        for item in episode_annotations
-        if isinstance(item, dict)
-    }
+        match_paths = {
+            str(path)
+            for path in (
+                episode_item.get("episode_video_path"),
+                (annotation.get("_standard_episode_entry") or {}).get("episode_video_path"),
+            )
+            if path
+        }
+        replacement_episodes.append((episode_item, match_paths))
+    episode_annotations = []
+    used_replacements = set()
     if isinstance(existing_standard, dict):
+        existing_paths = {
+            str(item.get("episode_video_path", ""))
+            for item in existing_standard.get("episode_annotation") or []
+            if isinstance(item, dict)
+        }
+        for replacement_index, (episode_item, match_paths) in enumerate(replacement_episodes):
+            if not match_paths.intersection(existing_paths):
+                episode_annotations.append(renumber_standard_episode(episode_item, len(episode_annotations)))
+                used_replacements.add(replacement_index)
         for item in existing_standard.get("episode_annotation") or []:
             if not isinstance(item, dict):
                 continue
             episode_path = str(item.get("episode_video_path", ""))
-            if not episode_path or episode_path in seen_episode_paths or not item.get("subtasks"):
+            if not episode_path or not item.get("subtasks"):
                 continue
-            preserved = dict(item)
-            preserved["id"] = len(episode_annotations)
-            for subtask_index, subtask in enumerate(preserved.get("subtasks") or []):
-                if not isinstance(subtask, dict):
-                    continue
-                subtask["id"] = subtask_index
-                for action_key in ("primary_action", "auxiliary_action"):
-                    action = subtask.get(action_key)
-                    if not isinstance(action, dict):
-                        continue
-                    for phase_index, phase in enumerate(action.get("phases") or []):
-                        if isinstance(phase, dict):
-                            phase["id"] = phase_index
-            episode_annotations.append(preserved)
-            seen_episode_paths.add(episode_path)
+            replacement_index = next(
+                (
+                    index
+                    for index, (_, match_paths) in enumerate(replacement_episodes)
+                    if index not in used_replacements and episode_path in match_paths
+                ),
+                None,
+            )
+            if replacement_index is not None:
+                replacement_item = replacement_episodes[replacement_index][0]
+                episode_annotations.append(renumber_standard_episode(replacement_item, len(episode_annotations)))
+                used_replacements.add(replacement_index)
+            else:
+                episode_annotations.append(renumber_standard_episode(item, len(episode_annotations)))
+        for replacement_index, (episode_item, _) in enumerate(replacement_episodes):
+            if replacement_index not in used_replacements:
+                episode_annotations.append(renumber_standard_episode(episode_item, len(episode_annotations)))
+    else:
+        for episode_item, _ in replacement_episodes:
+            episode_annotations.append(renumber_standard_episode(episode_item, len(episode_annotations)))
     task_id = str(common_record.get("task_id") or fallback_task_id or representative_episode.get("task_id", ""))
-    result = {
+    result = copy.deepcopy(existing_standard) if isinstance(existing_standard, dict) else {}
+    result.update({
         "version": STANDARD_VERSION,
         "annotation_spec_version": ANNOTATION_SPEC_VERSION,
         "task_id": task_id,
@@ -359,7 +410,7 @@ def to_standard_task_annotation(
         "robot_setup": standard_robot_setup(shared_robot_setup),
         "scene": standard_scene(shared_scene),
         "episode_annotation": episode_annotations,
-    }
+    })
     return result
 
 
@@ -402,6 +453,38 @@ def standard_episode_is_annotated(episode_entry: dict[str, Any] | None) -> bool:
     return any(isinstance(subtask, dict) for subtask in (episode_entry.get("subtasks") or []))
 
 
+def annotation_source_label(source: str | None) -> str:
+    value = str(source or "").strip().lower()
+    labels = {
+        "human": "人工(human)",
+        "vlm": "VLM(vlm)",
+        "automatic": "自动(automatic)",
+        "hybrid": "混合(hybrid)",
+    }
+    return labels.get(value, value) if value else ""
+
+
+def episode_annotation_source_text(episode_entry: dict[str, Any] | None) -> str:
+    if not standard_episode_is_annotated(episode_entry):
+        return ""
+    meta = episode_entry.get("annotation_meta") if isinstance(episode_entry, dict) else {}
+    if isinstance(meta, dict):
+        label = annotation_source_label(meta.get("source"))
+        if label:
+            return label
+    return annotation_source_label("human")
+
+
+def mark_annotation_human_reviewed(annotation: dict[str, Any]) -> None:
+    annotation_meta = annotation.get("annotation_meta")
+    if not isinstance(annotation_meta, dict):
+        annotation["annotation_meta"] = {"source": "human"}
+        return
+    source = str(annotation_meta.get("source", "")).strip().lower()
+    if source in {"automatic", "vlm"}:
+        annotation_meta["source"] = "hybrid"
+
+
 def find_standard_episode(
     standard: dict[str, Any],
     episode: EpisodeItem,
@@ -415,6 +498,32 @@ def find_standard_episode(
             continue
         if str(item.get("episode_video_path", "")) in candidate_paths:
             return item
+    candidate_names = {Path(path).name for path in candidate_paths if path}
+    candidate_stems = {
+        Path(path).stem
+        for path in candidate_paths
+        if path
+    }
+    candidate_stems.update(
+        value
+        for value in (
+            str(episode.episode_id).split("/")[-1],
+            str(episode.annotation_stem).split("__")[-1],
+        )
+        if value
+    )
+    fallback_matches = []
+    for item in standard.get("episode_annotation") or []:
+        if not isinstance(item, dict):
+            continue
+        episode_path = str(item.get("episode_video_path", "")).strip()
+        if not episode_path:
+            continue
+        path = Path(episode_path)
+        if path.name in candidate_names or path.stem in candidate_stems:
+            fallback_matches.append(item)
+    if len(fallback_matches) == 1:
+        return fallback_matches[0]
     return None
 
 
@@ -504,6 +613,7 @@ def annotation_from_standard_episode(
     annotation["scene"] = scene_from_standard(standard)
     annotation["robot_setup"] = robot_setup_from_standard(standard)
     annotation["annotation_meta"] = dict(episode_entry.get("annotation_meta") or {})
+    annotation["_standard_episode_entry"] = copy.deepcopy(episode_entry)
     subtasks = []
     for subtask in episode_entry.get("subtasks") or []:
         if not isinstance(subtask, dict):
@@ -522,6 +632,7 @@ def annotation_from_standard_episode(
                 phases_from_standard(subtask.get("primary_action"), "primary")
                 + phases_from_standard(subtask.get("auxiliary_action"), "auxiliary")
             ),
+            "_standard_subtask_entry": copy.deepcopy(subtask),
         }
         prediction_meta = subtask.get("subtask_prediction_meta") or subtask.get("prediction_meta")
         if isinstance(prediction_meta, dict):

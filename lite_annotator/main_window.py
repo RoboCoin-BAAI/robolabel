@@ -51,7 +51,9 @@ from lite_annotator.segment_editor import load_phase_actions
 from lite_annotator.segment_editor import SegmentEditor
 from lite_annotator.standard_export import (
     annotation_from_standard_episode,
+    episode_annotation_source_text,
     find_standard_episode,
+    mark_annotation_human_reviewed,
     read_standard_task_file,
     standard_annotation_path,
     standard_episode_is_annotated,
@@ -147,17 +149,19 @@ class MainWindow(QMainWindow):
         self.loading_episode = False
 
         self.video_list = QTableWidget()
-        self.video_list.setColumnCount(2)
+        self.video_list.setColumnCount(3)
         self.video_list.setHorizontalHeaderLabels([
             bilingual_label("状态", "status"),
+            bilingual_label("来源", "source"),
             bilingual_label("数据条目", "episode"),
         ])
         self.video_list.verticalHeader().setVisible(False)
         self.video_list.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.video_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.video_list.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.video_list.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.video_list.setColumnWidth(0, 120)
+        self.video_list.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.video_list.setColumnWidth(0, 100)
+        self.video_list.setColumnWidth(1, 130)
         self.video_list.currentCellChanged.connect(self.load_selected_episode)
         self.video_player = MultiCameraVideoPlayer()
         self.segment_editor = SegmentEditor()
@@ -340,9 +344,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Dataset load failed", str(exc))
             return
         annotated_keys = set()
+        annotation_bundle = {}
         annotation_file = self.active_annotation_file()
         if annotation_file:
             annotated_keys = set(load_annotated_episode_keys(annotation_file))
+            annotation_bundle = load_annotation_bundle(annotation_file)
         standard_annotation = {}
         if self.dataset_root:
             standard_annotation = read_standard_task_file(standard_annotation_path(self.dataset_root))
@@ -356,16 +362,24 @@ class MainWindow(QMainWindow):
                 episode.annotation_stem in annotated_keys
                 or standard_episode_is_annotated(standard_episode)
             )
+            source_text = self.episode_source_text(
+                episode,
+                standard_episode,
+                annotation_bundle,
+            )
             row = self.video_list.rowCount()
             self.video_list.insertRow(row)
             status_item = QTableWidgetItem(
                 self.episode_status_text(annotated)
             )
+            source_item = QTableWidgetItem(source_text)
             episode_item = QTableWidgetItem(episode.display_name)
             status_item.setData(Qt.UserRole, episode)
+            source_item.setData(Qt.UserRole, episode)
             episode_item.setData(Qt.UserRole, episode)
             self.video_list.setItem(row, 0, status_item)
-            self.video_list.setItem(row, 1, episode_item)
+            self.video_list.setItem(row, 1, source_item)
+            self.video_list.setItem(row, 2, episode_item)
         self.video_list.blockSignals(False)
         self.validation_messages.setText(
             f"Loaded {self.dataset_type.value}: {len(self.episodes)} episodes, "
@@ -376,10 +390,30 @@ class MainWindow(QMainWindow):
     def episode_status_text(self, annotated: bool) -> str:
         return bilingual_label("已标注", "annotated") if annotated else ""
 
+    def bundle_episode_source_text(self, annotation_bundle: dict, annotation_stem: str) -> str:
+        annotation = (annotation_bundle.get("annotations") or {}).get(annotation_stem)
+        if not isinstance(annotation, dict) or not annotation.get("subtasks"):
+            return ""
+        return episode_annotation_source_text({
+            "annotation_meta": annotation.get("annotation_meta") or {"source": "human"},
+            "subtasks": annotation.get("subtasks"),
+        })
+
+    def episode_source_text(
+        self,
+        episode: EpisodeItem,
+        standard_episode: dict | None,
+        annotation_bundle: dict,
+    ) -> str:
+        source_text = episode_annotation_source_text(standard_episode)
+        if source_text:
+            return source_text
+        return self.bundle_episode_source_text(annotation_bundle, episode.annotation_stem)
+
     def episode_from_row(self, row: int) -> EpisodeItem | None:
         if row < 0:
             return None
-        item = self.video_list.item(row, 1) or self.video_list.item(row, 0)
+        item = self.video_list.item(row, 2) or self.video_list.item(row, 1) or self.video_list.item(row, 0)
         return item.data(Qt.UserRole) if item else None
 
     def refresh_current_episode_label(self):
@@ -399,6 +433,7 @@ class MainWindow(QMainWindow):
             return
         annotation_file = self.active_annotation_file()
         annotated_keys = set(load_annotated_episode_keys(annotation_file)) if annotation_file else set()
+        annotation_bundle = load_annotation_bundle(annotation_file) if annotation_file else {}
         standard_episode = None
         if self.dataset_root:
             standard_annotation = read_standard_task_file(standard_annotation_path(self.dataset_root))
@@ -419,6 +454,18 @@ class MainWindow(QMainWindow):
                 or standard_episode_is_annotated(standard_episode)
             )
         )
+        source_item = self.video_list.item(row, 1)
+        if source_item is None:
+            source_item = QTableWidgetItem()
+            source_item.setData(Qt.UserRole, self.current_episode)
+            self.video_list.setItem(row, 1, source_item)
+        source_item.setText(
+            self.episode_source_text(
+                self.current_episode,
+                standard_episode,
+                annotation_bundle,
+            )
+        )
 
     def load_selected_episode(self, current_row, current_column, previous_row, previous_column):
         episode = self.episode_from_row(current_row)
@@ -426,11 +473,6 @@ class MainWindow(QMainWindow):
             self.load_episode(episode)
 
     def load_saved_annotation(self, annotation_stem: str):
-        bundle_path = self.active_annotation_file()
-        if bundle_path:
-            bundle_annotation = load_annotation_from_bundle(bundle_path, annotation_stem)
-            if bundle_annotation:
-                return bundle_annotation
         if self.dataset_root and self.current_episode:
             standard_path = standard_annotation_path(self.dataset_root)
             standard_annotation = read_standard_task_file(standard_path)
@@ -439,12 +481,17 @@ class MainWindow(QMainWindow):
                 self.current_episode,
                 self.current_video_path,
             ) if standard_annotation else None
-            if standard_episode:
+            if standard_episode_is_annotated(standard_episode):
                 return annotation_from_standard_episode(
                     standard_annotation,
                     standard_episode,
                     self.build_episode_metadata(self.current_episode),
                 )
+        bundle_path = self.active_annotation_file()
+        if bundle_path:
+            bundle_annotation = load_annotation_from_bundle(bundle_path, annotation_stem)
+            if bundle_annotation and bundle_annotation.get("subtasks"):
+                return bundle_annotation
         return None
 
     def apply_shared_task_fields(self, annotation):
@@ -492,7 +539,13 @@ class MainWindow(QMainWindow):
             self.sync_phase_object_options()
             self.segment_editor.set_segments(self.annotation.get("subtasks") or [])
             self.video_player.set_subtasks(self.current_subtasks())
-            self.validation_messages.clear()
+            source_text = episode_annotation_source_text({
+                "annotation_meta": self.annotation.get("annotation_meta") or {},
+                "subtasks": self.annotation.get("subtasks") or [],
+            })
+            self.validation_messages.setText(
+                f"当前标注来源: {source_text}" if source_text else ""
+            )
         finally:
             self.loading_episode = False
 
@@ -700,6 +753,31 @@ class MainWindow(QMainWindow):
         })
         save_annotation_to_bundle(annotation_file, annotation_stem, annotation)
 
+    def write_standard_annotation_file(self, annotation_file: Path) -> Path | None:
+        if not self.dataset_root:
+            return None
+        bundle = load_annotation_bundle(annotation_file)
+        export_path = standard_annotation_path(self.dataset_root)
+        existing_standard = read_standard_task_file(export_path)
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+        primary_video_paths = {
+            episode.annotation_stem: str(episode.camera_videos.get(self.main_camera) or episode.primary_video_path)
+            for episode in self.episodes
+        }
+        standard_annotation = to_standard_task_annotation(
+            bundle,
+            dataset_type=self.dataset_type,
+            dataset_root=self.dataset_root,
+            primary_video_paths=primary_video_paths,
+            episode_order=[episode.annotation_stem for episode in self.episodes],
+            existing_standard=existing_standard,
+        )
+        export_path.write_text(
+            json.dumps(standard_annotation, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return export_path
+
     def validate_current_annotation(self):
         try:
             annotation = self.collect_annotation()
@@ -732,10 +810,15 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Validation failed", "Fix validation errors before saving.")
             return
         annotation_stem = self.active_annotation_stem()
+        mark_annotation_human_reviewed(annotation)
         self.persist_annotation(annotation_file, annotation_stem, annotation)
+        export_path = self.write_standard_annotation_file(annotation_file)
         self.annotation = annotation
         self.refresh_current_episode_label()
-        self.validation_messages.setText(f"Saved: {annotation_file}")
+        if export_path:
+            self.validation_messages.setText(f"Saved: {annotation_file}\nUpdated: {export_path}")
+        else:
+            self.validation_messages.setText(f"Saved: {annotation_file}")
 
     def export_current_json(self):
         annotation_file = self.active_annotation_file()
@@ -751,27 +834,9 @@ class MainWindow(QMainWindow):
         if annotation is None:
             return
         annotation_stem = self.active_annotation_stem()
+        mark_annotation_human_reviewed(annotation)
         self.persist_annotation(annotation_file, annotation_stem, annotation)
-        bundle = load_annotation_bundle(annotation_file)
-        export_path = standard_annotation_path(self.dataset_root)
-        existing_standard = read_standard_task_file(export_path)
-        export_path.parent.mkdir(parents=True, exist_ok=True)
-        primary_video_paths = {
-            episode.annotation_stem: str(episode.camera_videos.get(self.main_camera) or episode.primary_video_path)
-            for episode in self.episodes
-        }
-        standard_annotation = to_standard_task_annotation(
-            bundle,
-            dataset_type=self.dataset_type,
-            dataset_root=self.dataset_root,
-            primary_video_paths=primary_video_paths,
-            episode_order=[episode.annotation_stem for episode in self.episodes],
-            existing_standard=existing_standard,
-        )
-        export_path.write_text(
-            json.dumps(standard_annotation, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        export_path = self.write_standard_annotation_file(annotation_file)
         self.annotation = annotation
         self.refresh_current_episode_label()
         self.validation_messages.setText(f"Exported: {export_path}")
