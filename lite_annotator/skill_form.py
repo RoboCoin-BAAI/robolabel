@@ -20,6 +20,7 @@ from common.skill_schema import (
     load_skill_templates,
     render_subtask_text,
 )
+from lite_annotator.object_attributes import object_ref_matches
 from lite_annotator.ui_text import bilingual_label
 
 TEMPLATE_SET_VERSION, SKILL_TEMPLATES = load_skill_templates()
@@ -153,9 +154,18 @@ class SkillForm(QWidget):
         return editor
 
     def add_scene_object_options(self, editor):
-        for value, label in self.scene_object_options.items():
+        for _, item in self.scene_object_options.items():
+            if not isinstance(item, dict):
+                continue
+            value = {
+                "name": str(item.get("name", "")).strip(),
+                "color": str(item.get("color", "")).strip(),
+                "material": str(item.get("material", "")).strip(),
+            }
+            if not value["name"]:
+                continue
             if editor.findData(value) < 0:
-                editor.addItem(bilingual_label(label, value), value)
+                editor.addItem(str(item.get("label", value["name"])), value)
 
     def attach_combo_completer(self, combo):
         completer = QCompleter([combo.itemText(index) for index in range(combo.count())], combo)
@@ -168,24 +178,23 @@ class SkillForm(QWidget):
         if isinstance(widget, QComboBox):
             text = widget.currentText().strip()
             for index in range(widget.count()):
-                item_data = str(widget.itemData(index) or "").strip()
+                item_data = widget.itemData(index)
                 item_text = widget.itemText(index).strip()
-                object_label = str(self.scene_object_options.get(item_data, "")).strip()
-                if text in (item_text, item_data, object_label):
-                    return str(widget.itemData(index) or "").strip()
+                if text == item_text or object_ref_matches(item_data, text):
+                    return item_data
             return text
         return widget.text().strip()
 
     def set_widget_value(self, widget, value):
-        value = str(value)
         if isinstance(widget, QComboBox):
             for index in range(widget.count()):
-                if str(widget.itemData(index)) == value:
+                item_data = widget.itemData(index)
+                if item_data == value or object_ref_matches(item_data, value):
                     widget.setCurrentIndex(index)
                     return
-            widget.setEditText(value)
+            widget.setEditText(str(value))
             return
-        widget.setText(value)
+        widget.setText(str(value))
 
     def clear_values(self):
         for widget in self.slot_widgets.values():

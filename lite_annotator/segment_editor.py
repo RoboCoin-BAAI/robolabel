@@ -21,8 +21,8 @@ from PyQt5.QtWidgets import (
 )
 
 from common.skill_schema import load_skill_templates
+from lite_annotator.object_attributes import object_ref_matches, object_ref_text
 from lite_annotator.ui_text import bilingual_label
-from lite_annotator.vocabulary import option_label
 from lite_annotator.skill_library import skill_display_text
 
 PHASE_ACTIONS_PATH = Path(__file__).resolve().parents[1] / "config" / "phase_actions.json"
@@ -77,8 +77,16 @@ class PhaseDialog(QDialog):
                 continue
             self.action_select.addItem(f"{label}({value})", value)
         self.object_select = QComboBox()
-        for value, label in (object_options or {}).items():
-            self.object_select.addItem(option_label(str(value), str(label)), str(value))
+        for _, item in (object_options or {}).items():
+            if not isinstance(item, dict):
+                continue
+            value = {
+                "name": str(item.get("name", "")).strip(),
+                "color": str(item.get("color", "")).strip(),
+                "material": str(item.get("material", "")).strip(),
+            }
+            if value["name"]:
+                self.object_select.addItem(str(item.get("label", value["name"])), value)
         self.target_action_select = QComboBox()
         for value, label in self.action_targets:
             self.target_action_select.addItem(str(label), str(value))
@@ -131,7 +139,7 @@ class PhaseDialog(QDialog):
             "start_frame": start,
             "end_frame": end,
             "action": str(self.action_select.currentData() or self.action_select.currentText()),
-            "object": str(self.object_select.currentData() or self.object_select.currentText()),
+            "object": self.object_select.currentData() or self.object_select.currentText(),
             "target_action": str(self.target_action_select.currentData() or "primary"),
         }
 
@@ -141,7 +149,7 @@ class PhaseDialog(QDialog):
             item = QListWidgetItem(
                 f"{index}. {int(phase['start_frame'])}:{int(phase['end_frame'])}  "
                 f"{phase.get('target_action', 'primary')}  "
-                f"{phase.get('action', '')}  {phase.get('object', '')}"
+                f"{phase.get('action', '')}  {object_ref_text(phase.get('object', ''))}"
             )
             self.phase_list_widget.addItem(item)
 
@@ -175,9 +183,11 @@ class PhaseDialog(QDialog):
         action_index = self.action_select.findData(phase.get("action"))
         if action_index >= 0:
             self.action_select.setCurrentIndex(action_index)
-        object_index = self.object_select.findData(phase.get("object"))
-        if object_index >= 0:
-            self.object_select.setCurrentIndex(object_index)
+        for index in range(self.object_select.count()):
+            item_data = self.object_select.itemData(index)
+            if item_data == phase.get("object") or object_ref_matches(item_data, phase.get("object")):
+                self.object_select.setCurrentIndex(index)
+                break
         target_index = self.target_action_select.findData(phase.get("target_action", "primary"))
         if target_index >= 0:
             self.target_action_select.setCurrentIndex(target_index)

@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from lite_annotator.object_attributes import object_ref_text
 from lite_annotator.ui_text import bilingual_label
 from lite_annotator.ui_theme import scaled
 from lite_annotator.video_decode import VideoFrameReader
@@ -333,7 +334,10 @@ class MultiCameraVideoPlayer(QWidget):
         self.refresh_current_subtask_label()
 
     def display_value(self, value, labels):
-        value = str(value or "")
+        if isinstance(value, dict):
+            value = object_ref_text(value)
+        else:
+            value = str(value or "")
         return option_label(value, labels.get(value, value)) if value else ""
 
     def refresh_current_subtask_label(self) -> None:

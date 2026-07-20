@@ -114,6 +114,47 @@ def test_task_export_uses_task_level_schema_and_numeric_ids():
     assert episode["subtasks"][0]["primary_action"]["phases"][0]["id"] == 0
 
 
+def test_task_export_preserves_structured_object_attributes():
+    annotation = make_annotation("/data/task/cam_top/episode_000000.mp4")
+    annotation["scene"]["objects"] = [
+        {
+            "name": "block",
+            "color": "red",
+            "material": "wooden",
+            "affordance": ["graspable"],
+        }
+    ]
+    object_ref = {"name": "block", "color": "red", "material": "wooden"}
+    annotation["subtasks"][0]["actions"][0]["slots"]["manipulated_object"] = object_ref
+    annotation["subtasks"][0]["phases"][0]["object"] = object_ref
+    bundle = {
+        "task": {
+            "video_text": annotation["video_text"],
+            "scene": annotation["scene"],
+            "robot_setup": annotation["robot_setup"],
+        },
+        "annotations": {"episode_000000": annotation},
+    }
+
+    standard = to_standard_task_annotation(
+        bundle,
+        dataset_type=DatasetType.COROBOT,
+        dataset_root="/data/task",
+        primary_video_paths={"episode_000000": "/data/task/cam_top/episode_000000.mp4"},
+    )
+
+    assert standard["scene"]["objects"][0] == {
+        "id": 0,
+        "name": "block",
+        "affordance": ["graspable"],
+        "color": "red",
+        "material": "wooden",
+    }
+    primary_action = standard["episode_annotation"][0]["subtasks"][0]["primary_action"]
+    assert primary_action["slots"]["manipulated_object"] == object_ref
+    assert primary_action["phases"][0]["object"] == object_ref
+
+
 def test_task_export_preserves_existing_automatic_episodes_by_video_path():
     bundle = {
         "task": {
@@ -250,6 +291,48 @@ def test_find_standard_episode_falls_back_to_episode_file_name_when_roots_differ
     )
 
     assert find_standard_episode(standard, episode) is standard_episode
+
+
+def test_find_standard_episode_matches_corobot_child_folder_when_episode_file_names_repeat():
+    target = {
+        "episode_video_path": (
+            "/cloud/data/Agilex_Task_959/Agilex_Task_959_92716/"
+            "videos/chunk-000/observation.images.image_top/episode_000000.mp4"
+        ),
+        "subtasks": [{"id": 0}],
+    }
+    standard = {
+        "version": "annotation_schema_v1",
+        "episode_annotation": [
+            {
+                "episode_video_path": (
+                    "/cloud/data/Agilex_Task_959/Agilex_Task_959_92715/"
+                    "videos/chunk-000/observation.images.image_top/episode_000000.mp4"
+                ),
+                "subtasks": [{"id": 0}],
+            },
+            target,
+        ],
+    }
+    episode = EpisodeItem(
+        episode_id="Agilex_Task_959_92716/episode_000000",
+        display_name="Agilex_Task_959_92716/episode_000000",
+        annotation_stem="Agilex_Task_959_92716__episode_000000",
+        dataset_type=DatasetType.COROBOT,
+        dataset_root=Path("/local/data/Agilex_Task_959/Agilex_Task_959_92716"),
+        camera_videos={
+            "observation.images.image_top": Path(
+                "/local/data/Agilex_Task_959/Agilex_Task_959_92716/"
+                "videos/chunk-000/observation.images.image_top/episode_000000.mp4"
+            ),
+        },
+        primary_video_path=Path(
+            "/local/data/Agilex_Task_959/Agilex_Task_959_92716/"
+            "videos/chunk-000/observation.images.image_top/episode_000000.mp4"
+        ),
+    )
+
+    assert find_standard_episode(standard, episode) is target
 
 
 def test_episode_annotation_source_text_uses_annotation_meta_for_annotated_episode():

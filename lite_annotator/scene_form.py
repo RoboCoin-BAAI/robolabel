@@ -18,6 +18,14 @@ from PyQt5.QtWidgets import (
 )
 
 from common.skill_schema import build_scene_from_values, load_scene_templates
+from lite_annotator.object_attributes import (
+    extract_named_options,
+    object_color,
+    object_display_label,
+    object_material,
+    object_name,
+    object_ref_text,
+)
 from lite_annotator.ui_text import bilingual_label
 from lite_annotator.vocabulary import (
     extract_object_options,
@@ -31,6 +39,8 @@ SCENE_TEMPLATE = load_scene_templates()
 VOCABULARY = load_vocabulary()
 SPACE_OPTIONS = extract_space_options(VOCABULARY)
 OBJECT_OPTIONS = extract_object_options(VOCABULARY)
+COLOR_OPTIONS = extract_named_options(VOCABULARY, "object_colors")
+MATERIAL_OPTIONS = extract_named_options(VOCABULARY, "object_materials")
 AFFORDANCE_OPTIONS = {
     value: SCENE_TEMPLATE.get("enum_display_names", {})
     .get("affordance", {})
@@ -55,7 +65,15 @@ BASE_MOBILITY_OPTIONS = {
 
 
 class ObjectEditDialog(QDialog):
-    def __init__(self, object_value="", affordance=None, parent=None, allow_name_edit=True):
+    def __init__(
+        self,
+        object_value="",
+        affordance=None,
+        parent=None,
+        allow_name_edit=True,
+        color="",
+        material="",
+    ):
         super().__init__(parent)
         self.setWindowTitle(bilingual_label("物品属性", "object attributes"))
         affordance = affordance or []
@@ -77,6 +95,18 @@ class ObjectEditDialog(QDialog):
         self.set_combo_value(self.object_combo, object_value)
         self.object_combo.setEnabled(bool(allow_name_edit))
 
+        self.color_combo = QComboBox()
+        self.color_combo.addItem("-", "")
+        for value, label in COLOR_OPTIONS.items():
+            self.color_combo.addItem(option_label(value, label), value)
+        self.set_combo_value(self.color_combo, color)
+
+        self.material_combo = QComboBox()
+        self.material_combo.addItem("-", "")
+        for value, label in MATERIAL_OPTIONS.items():
+            self.material_combo.addItem(option_label(value, label), value)
+        self.set_combo_value(self.material_combo, material)
+
         self.affordance_list = QListWidget()
         self.affordance_list.setSelectionMode(QAbstractItemView.MultiSelection)
         for value, label in AFFORDANCE_OPTIONS.items():
@@ -93,6 +123,8 @@ class ObjectEditDialog(QDialog):
 
         form = QFormLayout()
         form.addRow(bilingual_label("物品", "object"), self.object_combo)
+        form.addRow(bilingual_label("颜色", "color"), self.color_combo)
+        form.addRow(bilingual_label("材质", "material"), self.material_combo)
         form.addRow(bilingual_label("Affordance", "affordance"), self.affordance_list)
 
         layout = QVBoxLayout(self)
@@ -104,7 +136,11 @@ class ObjectEditDialog(QDialog):
         if index >= 0:
             combo.setCurrentIndex(index)
         elif value:
-            combo.setEditText(str(value))
+            if combo.isEditable():
+                combo.setEditText(str(value))
+            else:
+                combo.addItem(str(value), str(value))
+                combo.setCurrentIndex(combo.count() - 1)
 
     def object_value(self):
         text_value = value_from_option_text(self.object_combo.currentText().strip(), OBJECT_OPTIONS)
@@ -117,9 +153,17 @@ class ObjectEditDialog(QDialog):
             if self.affordance_list.item(index).isSelected()
         ]
 
+    def color_value(self):
+        return str(self.color_combo.currentData() or "")
+
+    def material_value(self):
+        return str(self.material_combo.currentData() or "")
+
     def object_data(self):
         return {
             "name": self.object_value(),
+            "color": self.color_value(),
+            "material": self.material_value(),
             "affordance": self.affordance_values(),
         }
 
@@ -216,9 +260,15 @@ class SceneForm(QWidget):
         self.right_effector_label.setVisible(not is_single_arm)
         self.right_effector_type.setVisible(not is_single_arm)
 
-    def add_object_item(self, value="", affordance=None):
+    def add_object_item(self, value="", affordance=None, color="", material=""):
+        if isinstance(value, dict):
+            color = object_color(value)
+            material = object_material(value)
+            value = object_name(value)
         self.objects.append({
             "name": str(value).strip(),
+            "color": str(color).strip(),
+            "material": str(material).strip(),
             "affordance": list(affordance or []),
         })
         self.refresh_object_list()
@@ -240,7 +290,12 @@ class SceneForm(QWidget):
             return
         data = dialog.object_data()
         if data["name"]:
-            self.add_object_item(data["name"], data["affordance"])
+            self.add_object_item(
+                data["name"],
+                data["affordance"],
+                data["color"],
+                data["material"],
+            )
 
     def open_edit_object_dialog(self):
         row = self.objects_list.currentRow()
@@ -252,6 +307,8 @@ class SceneForm(QWidget):
             current.get("affordance") or [],
             self,
             allow_name_edit=False,
+            color=current.get("color", ""),
+            material=current.get("material", ""),
         )
         if dialog.exec_() != QDialog.Accepted:
             return
@@ -260,6 +317,8 @@ class SceneForm(QWidget):
         if name:
             self.objects[row] = {
                 "name": name,
+                "color": data["color"],
+                "material": data["material"],
                 "affordance": data["affordance"],
             }
             self.refresh_object_list(selected_row=row)
@@ -270,7 +329,8 @@ class SceneForm(QWidget):
         if row < 0 or row >= len(self.objects):
             return
         name = str(self.objects[row].get("name", "")).strip()
-        if name in self.referenced_objects:
+        ref_text = object_ref_text(self.objects[row])
+        if name in self.referenced_objects or ref_text in self.referenced_objects:
             self.message_label.setText("该物品已被后续标注使用，不能删除。")
             return
         self.objects.pop(row)
@@ -283,7 +343,12 @@ class SceneForm(QWidget):
         for obj in self.objects:
             name = obj.get("name", "")
             affordance = obj.get("affordance") or []
-            name_label = option_label(name, OBJECT_OPTIONS.get(name, name)) if name else ""
+            name_label = object_display_label(
+                obj,
+                OBJECT_OPTIONS,
+                COLOR_OPTIONS,
+                MATERIAL_OPTIONS,
+            ) if name else ""
             summary = ", ".join(
                 option_label(value, AFFORDANCE_OPTIONS.get(value, value))
                 for value in affordance
@@ -309,8 +374,19 @@ class SceneForm(QWidget):
 
     def selected_object_options(self):
         return {
-            value: OBJECT_OPTIONS.get(value, value)
-            for value in self.selected_object_values()
+            index: {
+                "name": str(obj.get("name", "")).strip(),
+                "color": str(obj.get("color", "")).strip(),
+                "material": str(obj.get("material", "")).strip(),
+                "label": object_display_label(
+                    obj,
+                    OBJECT_OPTIONS,
+                    COLOR_OPTIONS,
+                    MATERIAL_OPTIONS,
+                ),
+            }
+            for index, obj in enumerate(self.objects)
+            if str(obj.get("name", "")).strip()
         }
 
     def build_robot_setup(self):
@@ -358,12 +434,19 @@ class SceneForm(QWidget):
         seen = set()
         for obj in self.objects:
             name = str(obj.get("name", "")).strip()
-            if not name or name in seen:
+            object_key = (
+                name,
+                str(obj.get("color", "")).strip(),
+                str(obj.get("material", "")).strip(),
+            )
+            if not name or object_key in seen:
                 continue
-            seen.add(name)
+            seen.add(object_key)
             objects.append(
                 {
                     "name": name,
+                    "color": str(obj.get("color", "")).strip(),
+                    "material": str(obj.get("material", "")).strip(),
                     "role": "main",
                     "states": ["visible"],
                     "affordance": list(obj.get("affordance") or []),
@@ -396,7 +479,12 @@ class SceneForm(QWidget):
         objects = scene.get("objects") or []
         self.clear_objects()
         for item in objects:
-            self.add_object_item(item.get("name", ""), item.get("affordance") or [])
+            self.add_object_item(
+                item.get("name", ""),
+                item.get("affordance") or [],
+                item.get("color", ""),
+                item.get("material", ""),
+            )
 
     def clear(self):
         self.space.setCurrentIndex(0 if self.space.count() else -1)
@@ -416,4 +504,8 @@ class SceneForm(QWidget):
         if index >= 0:
             combo.setCurrentIndex(index)
         else:
-            combo.setEditText(str(value))
+            if combo.isEditable():
+                combo.setEditText(str(value))
+            elif value:
+                combo.addItem(str(value), str(value))
+                combo.setCurrentIndex(combo.count() - 1)

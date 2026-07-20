@@ -105,6 +105,60 @@ def test_schema_validation_accepts_optional_annotation_meta():
     assert validate_annotation(annotation) is None
 
 
+def test_action_slots_accept_structured_object_attributes():
+    _, skill_templates = load_skill_templates()
+    action = build_action_from_slot_values(
+        "pick",
+        {
+            "subject": "right_effector",
+            "manipulated_object": {
+                "name": "block",
+                "color": "red",
+                "material": "wooden",
+            },
+            "source_anchor": {
+                "name": "table",
+                "color": "",
+                "material": "wooden",
+            },
+            "grasp_anchor": "main body",
+            "grasp_method": "clamp",
+        },
+        skill_templates,
+    )
+
+    assert action["slots"]["manipulated_object"] == {
+        "name": "block",
+        "color": "red",
+        "material": "wooden",
+    }
+    assert "red wooden block" in action["text"]
+    annotation = make_annotation([{
+        "start_frame": 0,
+        "end_frame": 20,
+        "state": "normal",
+        "coordination_mode": "single_hand",
+        "actions": [action],
+        "text": render_subtask_text([action]),
+        "phases": [
+            {
+                "start_frame": 0,
+                "end_frame": 20,
+                "action": "grasp",
+                "object": {
+                    "name": "block",
+                    "color": "red",
+                    "material": "wooden",
+                },
+                "target_action": "primary",
+            }
+        ],
+    }])
+
+    assert validate_lite_annotation(annotation, frame_count=20) == []
+    assert validate_annotation(annotation) is None
+
+
 def test_schema_validation_accepts_hidden_standard_metadata_for_loaded_auto_annotations():
     annotation = make_annotation(
         [

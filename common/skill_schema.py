@@ -66,7 +66,15 @@ ROBOT_SETUP_ALLOWED_KEYS = {
     "left_effector_type",
     "right_effector_type",
 }
-SCENE_OBJECT_ALLOWED_KEYS = {"name", "role", "support_or_region", "states", "affordance"}
+SCENE_OBJECT_ALLOWED_KEYS = {
+    "name",
+    "color",
+    "material",
+    "role",
+    "support_or_region",
+    "states",
+    "affordance",
+}
 SCENE_LOCATION_ALLOWED_KEYS = {"space", "anchor"}
 EPISODE_ALLOWED_KEYS = {
     "episode_id",
@@ -322,6 +330,16 @@ def join_scene_items(items):
     return ", ".join([str(item).strip() for item in items if str(item).strip()])
 
 
+def scene_object_text(obj):
+    if not isinstance(obj, dict):
+        return ""
+    return " ".join(
+        str(obj.get(key, "")).strip()
+        for key in ("color", "material", "name")
+        if str(obj.get(key, "")).strip()
+    )
+
+
 def scene_render_values(scene):
     scene_location = scene.get("scene_location") or {}
     objects = scene.get("objects") or []
@@ -329,23 +347,23 @@ def scene_render_values(scene):
     other_objects = [obj for obj in objects if obj.get("role") == "other"]
 
     support_parts = [
-        f"{obj.get('name')} at {obj.get('support_or_region')}"
+        f"{scene_object_text(obj)} at {obj.get('support_or_region')}"
         for obj in main_objects
-        if str(obj.get("name", "")).strip() and str(obj.get("support_or_region", "")).strip()
+        if scene_object_text(obj) and str(obj.get("support_or_region", "")).strip()
     ]
     state_parts = []
     for obj in main_objects:
         states = split_text_list(obj.get("states"))
-        if str(obj.get("name", "")).strip() and states:
-            state_parts.append(f"{obj.get('name')} {join_scene_items(states)}")
+        if scene_object_text(obj) and states:
+            state_parts.append(f"{scene_object_text(obj)} {join_scene_items(states)}")
 
     return {
         "space": scene_location.get("space", ""),
         "anchor": scene_location.get("anchor", ""),
-        "main_objects": join_scene_items([obj.get("name") for obj in main_objects]),
+        "main_objects": join_scene_items([scene_object_text(obj) for obj in main_objects]),
         "support_or_region": "; ".join(support_parts),
         "object_states": "; ".join(state_parts),
-        "other_objects": join_scene_items([obj.get("name") for obj in other_objects]) or "no other objects",
+        "other_objects": join_scene_items([scene_object_text(obj) for obj in other_objects]) or "no other objects",
     }
 
 
@@ -367,6 +385,8 @@ def build_scene_from_values(scene_values, objects, scene_template):
     for obj in objects:
         normalized_obj = {
             "name": str(obj.get("name", "")).strip(),
+            "color": str(obj.get("color", "")).strip(),
+            "material": str(obj.get("material", "")).strip(),
             "role": str(obj.get("role", "")).strip(),
             "support_or_region": str(obj.get("support_or_region", "")).strip(),
             "states": split_text_list(obj.get("states")),
@@ -634,10 +654,20 @@ def normalize_legacy_annotation(annotation, skill_templates=None):
     return normalized
 
 
+def slot_text(value):
+    if isinstance(value, dict):
+        return " ".join(
+            str(value.get(key, "")).strip()
+            for key in ("color", "material", "name")
+            if str(value.get(key, "")).strip()
+        )
+    return str(value)
+
+
 def render_template(template, values):
     rendered = template
     for slot in extract_template_slots(template):
-        rendered = rendered.replace(f"[{slot}]", str(values.get(slot, "")))
+        rendered = rendered.replace(f"[{slot}]", slot_text(values.get(slot, "")))
     return rendered
 
 
@@ -658,7 +688,7 @@ def build_action_from_slot_values(skill_id, slot_values, skill_templates, allow_
     skill_config = get_skill(skill_id, skill_templates)
     missing_slots = [
         slot for slot in skill_config["required_slots"]
-        if not str(slot_values.get(slot, "")).strip()
+        if not slot_text(slot_values.get(slot, "")).strip()
     ]
     if missing_slots and not allow_empty:
         raise ValueError(f"缺少必填 slot: {missing_slots[0]}")
@@ -668,7 +698,11 @@ def build_action_from_slot_values(skill_id, slot_values, skill_templates, allow_
     for slot in skill_config["required_slots"]:
         if slot == "subject":
             continue
-        slots[slot] = str(slot_values.get(slot, "")).strip()
+        value = slot_values.get(slot, "")
+        if isinstance(value, dict):
+            slots[slot] = copy.deepcopy(value)
+        else:
+            slots[slot] = str(value).strip()
 
     action = {
         "subject": subject,
@@ -714,7 +748,7 @@ def validate_action(action, skill_templates, prefix="action"):
         return f"{prefix} 出现多余 slot: {extra}"
 
     for slot in required_slot_keys:
-        if not str(slots.get(slot, "")).strip():
+        if not slot_text(slots.get(slot, "")).strip():
             return f"{prefix} slot 不能为空: {slot}"
 
     for slot, allowed_values in skill_config.get("enum_constraints", {}).items():
@@ -835,7 +869,7 @@ def validate_subtask(subtask, skill_templates, coordination_modes, prefix="subta
                 f"{phase_prefix} action 不符合当前片段技能允许范围: "
                 f"{allowed_phase_actions}"
             )
-        if not str(phase.get("object", "")).strip():
+        if not slot_text(phase.get("object", "")).strip():
             return f"{phase_prefix} object 不能为空"
     if phases and previous_phase_end != end_frame:
         return f"{prefix}.phases 最后一个 phase 必须结束于 subtask 结束帧 {end_frame}"

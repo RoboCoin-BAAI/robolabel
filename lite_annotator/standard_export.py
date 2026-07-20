@@ -144,11 +144,18 @@ def standard_scene(scene: dict[str, Any] | None) -> dict[str, Any]:
         name = str(obj.get("name", "")).strip()
         if not name:
             continue
-        objects.append({
+        item = {
             "id": len(objects),
             "name": name,
             "affordance": list(obj.get("affordance") or []),
-        })
+        }
+        color = str(obj.get("color", "")).strip()
+        material = str(obj.get("material", "")).strip()
+        if color:
+            item["color"] = color
+        if material:
+            item["material"] = material
+        objects.append(item)
     return {
         "scene_type": str(location.get("space") or scene.get("task_type", "")),
         "objects": objects,
@@ -204,7 +211,7 @@ def standard_phase_list(phases, target_action: str, base_phases=None) -> list[di
             "start_frame": int(phase.get("start_frame", 0)),
             "end_frame": int(phase.get("end_frame", 0)),
             "action": str(phase.get("action", "")),
-            "object": str(phase.get("object", "")),
+            "object": copy.deepcopy(phase.get("object", "")),
         }
         prediction_meta = phase.get("phases_prediction_meta") or phase.get("prediction_meta")
         if isinstance(prediction_meta, dict):
@@ -512,6 +519,29 @@ def find_standard_episode(
         )
         if value
     )
+    dataset_root_names = {
+        value
+        for value in (
+            episode.dataset_root.name,
+            str(episode.episode_id).split("/")[0],
+            str(episode.annotation_stem).split("__")[0],
+        )
+        if value
+    }
+    path_matches = []
+    for item in standard.get("episode_annotation") or []:
+        if not isinstance(item, dict):
+            continue
+        episode_path = str(item.get("episode_video_path", "")).strip()
+        if not episode_path:
+            continue
+        path = Path(episode_path)
+        if path.name not in candidate_names and path.stem not in candidate_stems:
+            continue
+        if any(name in path.parts for name in dataset_root_names):
+            path_matches.append(item)
+    if len(path_matches) == 1:
+        return path_matches[0]
     fallback_matches = []
     for item in standard.get("episode_annotation") or []:
         if not isinstance(item, dict):
@@ -550,7 +580,7 @@ def phases_from_standard(action: dict[str, Any] | None, target_action: str) -> l
             "start_frame": int(phase.get("start_frame", 0)),
             "end_frame": int(phase.get("end_frame", 0)),
             "action": str(phase.get("action", "")),
-            "object": str(phase.get("object", "")),
+            "object": copy.deepcopy(phase.get("object", "")),
         }
         prediction_meta = phase.get("phases_prediction_meta") or phase.get("prediction_meta")
         if isinstance(prediction_meta, dict):
@@ -569,6 +599,8 @@ def scene_from_standard(standard: dict[str, Any]) -> dict[str, Any] | None:
         "objects": [
             {
                 "name": str(obj.get("name", "")),
+                "color": str(obj.get("color", "")).strip(),
+                "material": str(obj.get("material", "")).strip(),
                 "affordance": list(obj.get("affordance") or []),
             }
             for obj in scene.get("objects") or []

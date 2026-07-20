@@ -46,6 +46,7 @@ from lite_annotator.dataset_loader import (
     list_episodes,
 )
 from lite_annotator.multi_video_player import MultiCameraVideoPlayer
+from lite_annotator.object_attributes import object_name, object_ref_text
 from lite_annotator.scene_form import SceneForm
 from lite_annotator.segment_editor import load_phase_actions
 from lite_annotator.segment_editor import SegmentEditor
@@ -579,8 +580,13 @@ class MainWindow(QMainWindow):
     def sync_phase_object_options(self):
         object_options = self.scene_form.selected_object_options()
         self.segment_editor.set_scene_objects(object_options)
+        object_display_labels = {
+            object_ref_text(item): str(item.get("label", object_ref_text(item)))
+            for item in object_options.values()
+            if isinstance(item, dict) and object_ref_text(item)
+        }
         self.video_player.set_display_label_maps(
-            object_options=object_options,
+            object_options=object_display_labels,
             action_options={value: label for value, label in load_phase_actions()},
         )
         self.update_scene_object_references()
@@ -593,16 +599,24 @@ class MainWindow(QMainWindow):
             if not isinstance(action, dict):
                 continue
             slots = action.get("slots") or {}
-            for key in OBJECT_SLOT_KEYS:
-                value = str(slots.get(key, "")).strip()
+            for key in OBJECT_SLOT_KEYS | {"source_anchor", "destination_anchor"}:
+                raw_value = slots.get(key, "")
+                value = object_ref_text(raw_value) if isinstance(raw_value, dict) else str(raw_value).strip()
                 if value:
                     values.add(value)
+                name = object_name(raw_value)
+                if name:
+                    values.add(name)
         for phase in subtask.get("phases") or []:
             if not isinstance(phase, dict):
                 continue
-            value = str(phase.get("object", "")).strip()
+            raw_value = phase.get("object", "")
+            value = object_ref_text(raw_value) if isinstance(raw_value, dict) else str(raw_value).strip()
             if value:
                 values.add(value)
+            name = object_name(raw_value)
+            if name:
+                values.add(name)
         return values
 
     def referenced_scene_objects(self):

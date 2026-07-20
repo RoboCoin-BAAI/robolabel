@@ -62,6 +62,8 @@ enum_display_names:
     near: 附近
     far: 远处
     same_position: 原位
+    left_effector: 左末端
+    right_effector: 右末端
     unknown: 无法判断
   destination_anchor:
     left: 左
@@ -74,6 +76,8 @@ enum_display_names:
     near: 附近
     far: 远处
     same_position: 原位
+    left_effector: 左末端
+    right_effector: 右末端
     unknown: 无法判断
   placement_relation:
     'on': 在...上
@@ -297,6 +301,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     destination_anchor:
     - left
@@ -309,6 +315,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
   end_frame_definition: 物体停止被转移的第一帧
   meaning: 物体已被稳定控制后移动到另一位置；只有明显空间移动才标注。
@@ -342,6 +350,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     grasp_method:
     - pinch
@@ -403,6 +413,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     placement_relation:
     - 'on'
@@ -504,6 +516,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     destination_anchor:
     - left
@@ -516,6 +530,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     push_anchor:
     - main_body
@@ -568,6 +584,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     destination_anchor:
     - left
@@ -580,6 +598,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     pull_anchor:
     - main_body
@@ -608,6 +628,223 @@ skills:
   - grasp
   - secure
   - pull_motion
+  - retreat
+- id: open
+  display_name: 打开
+  template: '[subject] open [interaction_target]'
+  ui_template: '[subject] 打开 [interaction_target]'
+  required_slots:
+  - subject
+  - interaction_target
+  end_frame_definition: 对象打开状态形成或开启动作结束的第一帧。
+  meaning: 打开具有开合状态的对象，如门、抽屉、盒盖、柜门、窗帘。
+  example: 右末端打开抽屉。
+  annotation_note: 强调开合状态变化；如果只描述施力位移，可使用 push 或 pull。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - pull_motion
+  - push_motion
+  - rotate_motion
+  - retreat
+- id: close
+  display_name: 关闭
+  template: '[subject] close [interaction_target]'
+  ui_template: '[subject] 关闭 [interaction_target]'
+  required_slots:
+  - subject
+  - interaction_target
+  end_frame_definition: 对象关闭状态形成或关闭动作结束的第一帧。
+  meaning: 关闭具有开合状态的对象，如门、抽屉、盒盖、柜门、窗帘。
+  example: 右末端关闭柜门。
+  annotation_note: 强调开合状态变化；如果只描述施力位移，可使用 push 或 pull。
+  allowed_phase_actions:
+  - approach
+  - align
+  - push_motion
+  - pull_motion
+  - position
+  - release
+  - retreat
+- id: scoop
+  display_name: 舀取/铲取
+  template: '[subject] scoop [substance] from [source_container] with [tool]'
+  ui_template: '[subject] 用 [tool] 从 [source_container] 舀取 [substance]'
+  required_slots:
+  - subject
+  - substance
+  - source_container
+  - tool
+  end_frame_definition: 舀取/铲取动作完成并离开源容器或源区域的第一帧。
+  meaning: 使用工具舀取、铲取液体、颗粒、粉末或小物体。
+  example: 右末端用勺子从碗中舀取颗粒。
+  annotation_note: 工具写机器人直接控制的勺子、铲子等；substance 写被舀取内容物类型。
+  allowed_phase_actions:
+  - approach
+  - align
+  - position
+  - lower
+  - carry
+  - retreat
+- id: cut
+  display_name: 切割
+  template: '[subject] cut [interaction_target] with [tool]'
+  ui_template: '[subject] 用 [tool] 切割 [interaction_target]'
+  required_slots:
+  - subject
+  - interaction_target
+  - tool
+  end_frame_definition: 本轮切割动作结束的第一帧。
+  meaning: 使用刀具、剪刀或其他工具切割目标对象。
+  example: 右末端用水果刀切割香蕉。
+  annotation_note: 目标对象写被切割物，tool 写刀具、剪刀等被直接控制工具。
+  allowed_phase_actions:
+  - approach
+  - align
+  - press_motion
+  - slide_motion
+  - retreat
+- id: hold
+  display_name: 固定/保持
+  template: '[subject] hold [interaction_target]'
+  ui_template: '[subject] 固定/保持 [interaction_target]'
+  required_slots:
+  - subject
+  - interaction_target
+  end_frame_definition: 保持/固定动作结束或目标不再被稳定约束的第一帧。
+  meaning: 稳定固定目标对象，常用于辅助另一只手执行主动作。
+  example: 左末端固定袋子，右末端拉开拉链。
+  annotation_note: 适合作为辅助动作；如果固定之前包含明显抓取，可在 phase 中标 grasp/secure。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - idle
+  - release
+  - retreat
+- id: stir
+  display_name: 搅拌
+  template: '[subject] stir [substance] in [destination_container] with [tool]'
+  ui_template: '[subject] 用 [tool] 搅拌 [destination_container] 中的 [substance]'
+  required_slots:
+  - subject
+  - substance
+  - destination_container
+  - tool
+  end_frame_definition: 本轮搅拌动作结束的第一帧。
+  meaning: 使用工具搅拌容器中的液体、粉末、颗粒或混合物。
+  example: 右末端用搅拌棒搅拌杯中的液体。
+  annotation_note: destination_container 写被搅拌内容物所在容器，tool 写搅拌棒、勺子等工具。
+  allowed_phase_actions:
+  - approach
+  - align
+  - position
+  - rotate_motion
+  - retreat
+- id: zip
+  display_name: 拉上/闭合拉链
+  template: '[subject] zip [interaction_target] from [source_anchor] to [destination_anchor]'
+  ui_template: '[subject] 拉上/闭合 [interaction_target]，从 [source_anchor] 到 [destination_anchor]'
+  required_slots:
+  - subject
+  - interaction_target
+  - source_anchor
+  - destination_anchor
+  enum_constraints:
+    source_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - left_effector
+    - right_effector
+    - unknown
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - left_effector
+    - right_effector
+    - unknown
+  end_frame_definition: 拉链闭合完成或拉动结束的第一帧。
+  meaning: 拉上或闭合拉链。
+  example: 右末端将收纳袋拉链从左侧拉到右侧并闭合。
+  annotation_note: 默认交互部位是拉链或拉头，不再单独填写部位。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - pull_motion
+  - position
+  - release
+  - retreat
+- id: unzip
+  display_name: 拉开/打开拉链
+  template: '[subject] unzip [interaction_target] from [source_anchor] to [destination_anchor]'
+  ui_template: '[subject] 拉开/打开 [interaction_target]，从 [source_anchor] 到 [destination_anchor]'
+  required_slots:
+  - subject
+  - interaction_target
+  - source_anchor
+  - destination_anchor
+  enum_constraints:
+    source_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - left_effector
+    - right_effector
+    - unknown
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - left_effector
+    - right_effector
+    - unknown
+  end_frame_definition: 拉链打开完成或拉动结束的第一帧。
+  meaning: 拉开或打开拉链。
+  example: 右末端将夹克拉链从上方向下方拉开。
+  annotation_note: 默认交互部位是拉链或拉头，不再单独填写部位。
+  allowed_phase_actions:
+  - approach
+  - align
+  - grasp
+  - secure
+  - pull_motion
+  - position
+  - release
   - retreat
 - id: twist
   display_name: 旋转
@@ -748,6 +985,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     destination_anchor:
     - left
@@ -760,6 +999,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
   end_frame_definition: 物体结束滑行力供给的第一帧
   meaning: 不拿起，沿表面滑动。
@@ -794,6 +1035,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     insert_anchor:
     - main_body
@@ -914,6 +1157,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
   end_frame_definition: 物体离开夹爪的第一帧
   meaning: 运动中释放、抛出或突然丢下。
@@ -943,6 +1188,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
     destination_anchor:
     - left
@@ -955,6 +1202,8 @@ skills:
     - near
     - far
     - same_position
+    - left_effector
+    - right_effector
     - unknown
   end_frame_definition: 机器人停止施加移动力的第一帧
   meaning: 机器人本体/底盘移动，不操作物体。
@@ -1015,6 +1264,26 @@ skills:
   allowed_phase_actions:
   - idle
   - retreat
+- id: return_to_initial_pose
+  display_name: 回到初始位姿/复位
+  template: '[subject] return to initial pose'
+  ui_template: '[subject] 回到初始位姿'
+  required_slots:
+  - subject
+  enum_constraints:
+    subject:
+    - effector
+    - left_effector
+    - right_effector
+    - both_effectors
+    - unknown
+  end_frame_definition: 末端回到初始/默认安全位姿并停止运动的第一帧
+  meaning: 任务完成后，单个或多个末端离开操作区域并恢复到初始位姿。
+  example: 右末端完成操作后回到初始位姿。
+  annotation_note: 用于任务末尾的复位片段；不是普通远离目标的 retreat 操作。
+  allowed_phase_actions:
+  - retreat
+  - idle
 - id: manipulate
   display_name: 其他操作
   template: '[subject] manipulate [interaction_target] at [position_anchor] and affect
