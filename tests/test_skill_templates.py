@@ -163,3 +163,28 @@ def test_common_tool_and_state_skills_are_available_with_simple_slots():
         assert skill["ui_template"] == expected_skill["ui_template"]
         assert skill["required_slots"] == expected_skill["required_slots"]
         assert skill["allowed_phase_actions"] == expected_skill["allowed_phase_actions"]
+
+
+def test_hand_over_skill_is_available_with_receiver_slot():
+    _, skills = load_skill_templates()
+    skill = skills["hand_over"]
+
+    assert skill["display_name"] == "递交/交接"
+    assert skill["template"] == "[subject] hand over [manipulated_object] to [destination_anchor]"
+    assert skill["ui_template"] == "[subject] 将 [manipulated_object] 递交给 [destination_anchor]"
+    assert skill["required_slots"] == [
+        "subject",
+        "manipulated_object",
+        "destination_anchor",
+    ]
+    assert skill["slot_display_names"]["destination_anchor"] == "接收方/目标位置"
+    assert "left_effector" in skill["enum_constraints"]["destination_anchor"]
+    assert "right_effector" in skill["enum_constraints"]["destination_anchor"]
+    assert skill["allowed_phase_actions"] == [
+        "approach",
+        "align",
+        "carry",
+        "position",
+        "release",
+        "retreat",
+    ]

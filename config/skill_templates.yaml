@@ -326,6 +326,42 @@ skills:
   - carry
   - position
   - navigate_motion
+- id: hand_over
+  display_name: 递交/交接
+  template: '[subject] hand over [manipulated_object] to [destination_anchor]'
+  ui_template: '[subject] 将 [manipulated_object] 递交给 [destination_anchor]'
+  required_slots:
+  - subject
+  - manipulated_object
+  - destination_anchor
+  slot_display_names:
+    destination_anchor: 接收方/目标位置
+  enum_constraints:
+    destination_anchor:
+    - left
+    - right
+    - up
+    - down
+    - front
+    - back
+    - center
+    - near
+    - far
+    - same_position
+    - left_effector
+    - right_effector
+    - unknown
+  end_frame_definition: 物体完成交接并脱离递交主体控制的第一帧。
+  meaning: 将已稳定控制的物体递交给另一个末端、机器人、人或目标接收位置。
+  example: 右末端将红色积木递交给左末端。
+  annotation_note: 强调接收方/交接关系；如果只是把物体搬到某个位置，使用 transfer。
+  allowed_phase_actions:
+  - approach
+  - align
+  - carry
+  - position
+  - release
+  - retreat
 - id: pick
   display_name: 抓起
   template: '[subject] pick up [manipulated_object] from [source_anchor], grasp anchor

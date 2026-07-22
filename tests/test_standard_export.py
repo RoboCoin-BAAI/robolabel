@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from common.skill_schema import render_subtask_text
 from lite_annotator.dataset_loader import DatasetType, EpisodeItem
 from lite_annotator.standard_export import (
     annotation_from_standard_episode,
@@ -153,6 +154,90 @@ def test_task_export_preserves_structured_object_attributes():
     primary_action = standard["episode_annotation"][0]["subtasks"][0]["primary_action"]
     assert primary_action["slots"]["manipulated_object"] == object_ref
     assert primary_action["phases"][0]["object"] == object_ref
+
+
+def test_standard_import_rebuilds_subtask_text_from_actions():
+    standard = {
+        "task_description": "pour water",
+        "task_type": "manipulation",
+        "scene": {
+            "scene_type": "table",
+            "objects": [
+                {"id": 0, "name": "cup", "affordance": ["receivable"]},
+                {"id": 1, "name": "bottle", "affordance": ["pourable"]},
+            ],
+        },
+        "robot_setup": {
+            "base": {"mobility_type": "unknown"},
+            "manipulators": [
+                {"id": 0, "mount_position": "left", "end_effector_type": "two_finger"},
+                {"id": 1, "mount_position": "right", "end_effector_type": "two_finger"},
+            ],
+        },
+        "episode_annotation": [
+            {
+                "id": 0,
+                "episode_video_path": "/data/task/cam_top/episode_000000.mp4",
+                "frame_count": 20,
+                "subtasks": [
+                    {
+                        "id": 0,
+                        "start_frame": 0,
+                        "end_frame": 20,
+                        "state": "normal",
+                        "coordination_mode": "primary_with_support",
+                        "description": (
+                            "left_effector pour liquid from bottle into cup by manipulating bottle "
+                            "and affect cup, while right_effector hold cup to assist/support the primary action"
+                        ),
+                        "primary_action": {
+                            "subject": "left_effector",
+                            "skill": "pour",
+                            "text": "left_effector pour liquid from bottle into cup by manipulating bottle and affect cup",
+                            "slots": {
+                                "substance": "liquid",
+                                "source_container": "bottle",
+                                "destination_container": "cup",
+                                "manipulated_object": "bottle",
+                                "changed_object": "cup",
+                            },
+                            "phases": [],
+                        },
+                        "auxiliary_action": {
+                            "subject": "right_effector",
+                            "skill": "hold",
+                            "text": "right_effector hold cup",
+                            "slots": {"interaction_target": "cup"},
+                            "phases": [],
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+
+    annotation = annotation_from_standard_episode(
+        standard,
+        standard["episode_annotation"][0],
+        {
+            "episode_id": "episode_000000",
+            "dataset_name": "Task",
+            "video_path": "/data/task/cam_top/episode_000000.mp4",
+            "primary_video_path": "/data/task/cam_top/episode_000000.mp4",
+            "views": {"cam_top": "/data/task/cam_top/episode_000000.mp4"},
+            "frames": 20,
+        },
+    )
+
+    subtask = annotation["subtasks"][0]
+    assert subtask["text"] == render_subtask_text(subtask["actions"])
+    assert subtask["text"] == (
+        "left_effector pour liquid from bottle into cup by manipulating bottle and affect cup; "
+        "meanwhile right_effector hold cup"
+    )
+    assert subtask["_standard_subtask_entry"]["description"].endswith(
+        "to assist/support the primary action"
+    )
 
 
 def test_task_export_preserves_existing_automatic_episodes_by_video_path():

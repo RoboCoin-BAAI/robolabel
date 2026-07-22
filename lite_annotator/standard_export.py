@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from common.skill_schema import render_subtask_text
 from lite_annotator.annotation_model import create_empty_annotation
 from lite_annotator.annotation_store import default_annotation_dir
 from lite_annotator.dataset_loader import DatasetType, EpisodeItem
@@ -658,7 +659,7 @@ def annotation_from_standard_episode(
             "end_frame": int(subtask.get("end_frame", 0)),
             "state": str(subtask.get("state", "normal") or "normal"),
             "coordination_mode": str(subtask.get("coordination_mode", "")),
-            "text": str(subtask.get("description", "")),
+            "text": render_subtask_text(actions),
             "actions": actions,
             "phases": (
                 phases_from_standard(subtask.get("primary_action"), "primary")
