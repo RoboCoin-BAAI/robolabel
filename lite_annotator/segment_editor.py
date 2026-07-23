@@ -46,6 +46,7 @@ class PhaseDialog(QDialog):
         object_options=None,
         phases=None,
         allowed_actions=None,
+        optional_actions=None,
         action_targets=None,
         subtask_start_frame=None,
         subtask_end_frame=None,
@@ -55,6 +56,7 @@ class PhaseDialog(QDialog):
         self.setWindowTitle(bilingual_label("phase标注", "phase annotation"))
         self.phases = list(phases or [])
         self.allowed_actions = set(allowed_actions or [])
+        self.optional_actions = set(optional_actions or [])
         self.action_targets = list(action_targets or [("primary", "主动作(primary)")])
         self.subtask_start_frame = subtask_start_frame
         self.subtask_end_frame = subtask_end_frame
@@ -75,7 +77,8 @@ class PhaseDialog(QDialog):
         for value, label in load_phase_actions():
             if self.allowed_actions and value not in self.allowed_actions:
                 continue
-            self.action_select.addItem(f"{label}({value})", value)
+            optional_suffix = " - 可选(optional)" if value in self.optional_actions else ""
+            self.action_select.addItem(f"{label}({value}){optional_suffix}", value)
         self.object_select = QComboBox()
         for _, item in (object_options or {}).items():
             if not isinstance(item, dict):
@@ -362,6 +365,18 @@ class SegmentEditor(QWidget):
                     allowed.append(phase_action)
         return allowed
 
+    def optional_phase_actions_for_subtask(self, subtask):
+        optional = []
+        allowed = set(self.allowed_phase_actions_for_subtask(subtask))
+        for action in (subtask or {}).get("actions") or []:
+            if not isinstance(action, dict):
+                continue
+            skill = SKILL_TEMPLATES.get(action.get("skill")) or {}
+            for phase_action in skill.get("optional_phase_actions") or []:
+                if phase_action in allowed and phase_action not in optional:
+                    optional.append(phase_action)
+        return optional
+
     def add_subtask_from_inputs(self):
         subtask = self.build_subtask_from_inputs()
         if subtask is None:
@@ -419,6 +434,7 @@ class SegmentEditor(QWidget):
             object_options=self.scene_object_options,
             phases=subtask.get("phases") or [],
             allowed_actions=self.allowed_phase_actions_for_subtask(subtask),
+            optional_actions=self.optional_phase_actions_for_subtask(subtask),
             action_targets=self.action_targets_for_subtask(subtask),
             subtask_start_frame=int(subtask.get("start_frame", key[0])),
             subtask_end_frame=int(subtask.get("end_frame", key[1])),

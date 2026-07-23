@@ -24,6 +24,7 @@ slot_display_names:
   insert_anchor: 插入口
   strike_anchor: 敲击部位
   tool: 工具
+  physical_motion: 物理动作方式
   description: 语义描述
 enum_constraints:
   subject:
@@ -102,6 +103,10 @@ enum_display_names:
     suction: 吸附抓取
     magnetic: 磁吸抓取
     unknown: 无法判断
+  physical_motion:
+    pull_motion: 拉动
+    push_motion: 推动
+    press_motion: 按压
   object_part_anchor:
     main_body: 主要部位
     top: 顶部
@@ -324,8 +329,6 @@ skills:
   annotation_note: 不包含抓起和释放；如果包含释放，应拆成 Transfer + Place。
   allowed_phase_actions:
   - carry
-  - position
-  - navigate_motion
 - id: hand_over
   display_name: 递交/交接
   template: '[subject] hand over [manipulated_object] to [destination_anchor]'
@@ -356,12 +359,11 @@ skills:
   example: 右末端将红色积木递交给左末端。
   annotation_note: 强调接收方/交接关系；如果只是把物体搬到某个位置，使用 transfer。
   allowed_phase_actions:
-  - approach
   - align
-  - carry
-  - position
+  - grasp
   - release
-  - retreat
+  optional_phase_actions:
+  - align
 - id: pick
   display_name: 抓起
   template: '[subject] pick up [manipulated_object] from [source_anchor], grasp anchor
@@ -424,8 +426,8 @@ skills:
   - approach
   - align
   - grasp
-  - secure
-  - lift
+  optional_phase_actions:
+  - align
 - id: place
   display_name: 放置
   template: '[subject] place [manipulated_object] [placement_relation] [destination_anchor]
@@ -467,10 +469,11 @@ skills:
   example: 右夹爪将杯子放到桌面右侧区域并释放。
   annotation_note: placement_relation 使用固定枚举；释放动作属于 Place。
   allowed_phase_actions:
-  - position
-  - lower
+  - carry
+  - align
   - release
-  - retreat
+  optional_phase_actions:
+  - align
 - id: press
   display_name: 按压
   template: '[subject] press [press_anchor] of [interaction_target] at [position_anchor]
@@ -526,7 +529,8 @@ skills:
   - approach
   - align
   - press_motion
-  - retreat
+  optional_phase_actions:
+  - align
 - id: push
   display_name: 推动
   template: '[subject] push [interaction_target] at [push_anchor] from [source_anchor]
@@ -594,7 +598,8 @@ skills:
   - approach
   - align
   - push_motion
-  - retreat
+  optional_phase_actions:
+  - align
 - id: pull
   display_name: 拉动
   template: '[subject] pull [interaction_target] at [pull_anchor] from [source_anchor]
@@ -661,17 +666,22 @@ skills:
   allowed_phase_actions:
   - approach
   - align
-  - grasp
-  - secure
   - pull_motion
-  - retreat
+  optional_phase_actions:
+  - align
 - id: open
   display_name: 打开
-  template: '[subject] open [interaction_target]'
-  ui_template: '[subject] 打开 [interaction_target]'
+  template: '[subject] open [interaction_target] with [physical_motion]'
+  ui_template: '[subject] 用 [physical_motion] 打开 [interaction_target]'
   required_slots:
   - subject
   - interaction_target
+  - physical_motion
+  enum_constraints:
+    physical_motion:
+    - pull_motion
+    - push_motion
+    - press_motion
   end_frame_definition: 对象打开状态形成或开启动作结束的第一帧。
   meaning: 打开具有开合状态的对象，如门、抽屉、盒盖、柜门、窗帘。
   example: 右末端打开抽屉。
@@ -680,18 +690,26 @@ skills:
   - approach
   - align
   - grasp
-  - secure
   - pull_motion
   - push_motion
-  - rotate_motion
-  - retreat
+  - press_motion
+  - release
+  optional_phase_actions:
+  - align
+  - release
 - id: close
   display_name: 关闭
-  template: '[subject] close [interaction_target]'
-  ui_template: '[subject] 关闭 [interaction_target]'
+  template: '[subject] close [interaction_target] with [physical_motion]'
+  ui_template: '[subject] 用 [physical_motion] 关闭 [interaction_target]'
   required_slots:
   - subject
   - interaction_target
+  - physical_motion
+  enum_constraints:
+    physical_motion:
+    - pull_motion
+    - push_motion
+    - press_motion
   end_frame_definition: 对象关闭状态形成或关闭动作结束的第一帧。
   meaning: 关闭具有开合状态的对象，如门、抽屉、盒盖、柜门、窗帘。
   example: 右末端关闭柜门。
@@ -699,11 +717,14 @@ skills:
   allowed_phase_actions:
   - approach
   - align
-  - push_motion
+  - grasp
   - pull_motion
-  - position
+  - push_motion
+  - press_motion
   - release
-  - retreat
+  optional_phase_actions:
+  - align
+  - release
 - id: scoop
   display_name: 舀取/铲取
   template: '[subject] scoop [substance] from [source_container] with [tool]'
@@ -718,12 +739,13 @@ skills:
   example: 右末端用勺子从碗中舀取颗粒。
   annotation_note: 工具写机器人直接控制的勺子、铲子等；substance 写被舀取内容物类型。
   allowed_phase_actions:
-  - approach
-  - align
-  - position
-  - lower
   - carry
-  - retreat
+  - align
+  - rotate_motion
+  - slide_motion
+  - lift
+  optional_phase_actions:
+  - align
 - id: cut
   display_name: 切割
   template: '[subject] cut [interaction_target] with [tool]'
@@ -737,11 +759,14 @@ skills:
   example: 右末端用水果刀切割香蕉。
   annotation_note: 目标对象写被切割物，tool 写刀具、剪刀等被直接控制工具。
   allowed_phase_actions:
-  - approach
+  - carry
   - align
   - press_motion
   - slide_motion
-  - retreat
+  - lift
+  optional_phase_actions:
+  - align
+  - slide_motion
 - id: hold
   display_name: 固定/保持
   template: '[subject] hold [interaction_target]'
@@ -754,13 +779,7 @@ skills:
   example: 左末端固定袋子，右末端拉开拉链。
   annotation_note: 适合作为辅助动作；如果固定之前包含明显抓取，可在 phase 中标 grasp/secure。
   allowed_phase_actions:
-  - approach
-  - align
-  - grasp
   - secure
-  - idle
-  - release
-  - retreat
 - id: stir
   display_name: 搅拌
   template: '[subject] stir [substance] in [destination_container] with [tool]'
@@ -775,11 +794,13 @@ skills:
   example: 右末端用搅拌棒搅拌杯中的液体。
   annotation_note: destination_container 写被搅拌内容物所在容器，tool 写搅拌棒、勺子等工具。
   allowed_phase_actions:
-  - approach
+  - carry
   - align
-  - position
+  - insert_motion
   - rotate_motion
-  - retreat
+  optional_phase_actions:
+  - align
+  - insert_motion
 - id: zip
   display_name: 拉上/闭合拉链
   template: '[subject] zip [interaction_target] from [source_anchor] to [destination_anchor]'
@@ -823,14 +844,8 @@ skills:
   example: 右末端将收纳袋拉链从左侧拉到右侧并闭合。
   annotation_note: 默认交互部位是拉链或拉头，不再单独填写部位。
   allowed_phase_actions:
-  - approach
-  - align
-  - grasp
-  - secure
   - pull_motion
-  - position
   - release
-  - retreat
 - id: unzip
   display_name: 拉开/打开拉链
   template: '[subject] unzip [interaction_target] from [source_anchor] to [destination_anchor]'
@@ -874,14 +889,8 @@ skills:
   example: 右末端将夹克拉链从上方向下方拉开。
   annotation_note: 默认交互部位是拉链或拉头，不再单独填写部位。
   allowed_phase_actions:
-  - approach
-  - align
-  - grasp
-  - secure
   - pull_motion
-  - position
   - release
-  - retreat
 - id: twist
   display_name: 旋转
   template: '[subject] twist [interaction_target] at [twist_anchor] [rotation_direction]
@@ -920,12 +929,7 @@ skills:
   example: 右夹爪顺时针拧动瓶盖。
   annotation_note: rotation_direction 固定为 clockwise / counterclockwise。
   allowed_phase_actions:
-  - approach
-  - align
-  - grasp
-  - secure
   - rotate_motion
-  - retreat
 - id: pour
   display_name: 倾倒
   template: '[subject] pour [substance] from [source_container] into [destination_container]
@@ -952,10 +956,12 @@ skills:
   example: 右夹爪握持水壶，将水从水壶倒入杯子。
   annotation_note: manipulated_object 是被机器人直接控制的容器；substance 是内容物类型。
   allowed_phase_actions:
-  - position
+  - carry
+  - align
   - tilt_motion
   - pour_motion
-  - retreat
+  optional_phase_actions:
+  - align
 - id: fold
   display_name: 折叠
   template: '[subject] fold [folded_part_anchor] of [manipulated_object] and affect
@@ -992,11 +998,11 @@ skills:
   - approach
   - align
   - grasp
-  - secure
   - fold_motion
-  - position
   - release
-  - retreat
+  optional_phase_actions:
+  - align
+  - release
 - id: slide
   display_name: 滑动
   template: '[subject] slide [manipulated_object] on [support_surface] from [source_anchor]
@@ -1045,8 +1051,12 @@ skills:
   allowed_phase_actions:
   - approach
   - align
+  - grasp
   - slide_motion
-  - retreat
+  - release
+  optional_phase_actions:
+  - align
+  - release
 - id: insert
   display_name: 插入
   template: '[subject] insert [manipulated_object] into [destination_anchor] through
@@ -1096,11 +1106,13 @@ skills:
   example: 右夹爪将积木插入盒子凹槽。
   annotation_note: insert_anchor 是入口/孔/槽；destination_anchor 是插入后的目标位置。
   allowed_phase_actions:
-  - position
+  - carry
   - align
   - insert_motion
   - release
-  - retreat
+  optional_phase_actions:
+  - align
+  - release
 - id: shake
   display_name: 摇晃
   template: '[subject] shake [manipulated_object] at [position_anchor] and affect
@@ -1136,6 +1148,9 @@ skills:
   allowed_phase_actions:
   - secure
   - shake_motion
+  - release
+  optional_phase_actions:
+  - release
 - id: strike
   display_name: 敲击
   template: '[subject] strike [interaction_target] at [strike_anchor] and affect [changed_object]'
@@ -1168,10 +1183,11 @@ skills:
   example: 右夹爪敲击白纸，使纸上出现印记。
   annotation_note: 当前模板不单独填写工具或末端；用 subject 表示执行主体。
   allowed_phase_actions:
-  - approach
+  - carry
   - align
   - strike_motion
-  - retreat
+  optional_phase_actions:
+  - align
 - id: throw
   display_name: 抛出
   template: '[subject] throw [manipulated_object] toward [destination_anchor] and
@@ -1202,8 +1218,10 @@ skills:
   annotation_note: 与 Place 区别：释放时物体仍有明显运动速度。
   allowed_phase_actions:
   - carry
-  - throw_motion
+  - align
   - release
+  optional_phase_actions:
+  - align
 - id: navigate
   display_name: 移动/导航
   template: '[subject] move from [source_anchor] to [destination_anchor]'
@@ -1282,10 +1300,13 @@ skills:
   example: 右夹爪使用马桶刷刷洗马桶内壁。
   annotation_note: tool 可以是刷子、抹布、海绵，也可以自定义填写。
   allowed_phase_actions:
-  - approach
+  - carry
   - align
   - scrub_motion
-  - retreat
+  - release
+  optional_phase_actions:
+  - align
+  - release
 - id: none
   display_name: 无任务相关操作
   template: '[subject] performs no task-relevant manipulation'
@@ -1299,7 +1320,6 @@ skills:
   annotation_note: 用于最终结束或开始写 none 的区间。
   allowed_phase_actions:
   - idle
-  - retreat
 - id: return_to_initial_pose
   display_name: 回到初始位姿/复位
   template: '[subject] return to initial pose'
@@ -1319,7 +1339,6 @@ skills:
   annotation_note: 用于任务末尾的复位片段；不是普通远离目标的 retreat 操作。
   allowed_phase_actions:
   - retreat
-  - idle
 - id: manipulate
   display_name: 其他操作
   template: '[subject] manipulate [interaction_target] at [position_anchor] and affect

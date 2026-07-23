@@ -201,6 +201,21 @@ def validate_skill_config(skill_config):
         if display_names and not isinstance(display_names, dict):
             raise ValueError(f"skill {skill_id} enum_display_names.{slot} must be a dict")
 
+    allowed_phase_actions = skill_config.get("allowed_phase_actions") or []
+    optional_phase_actions = skill_config.get("optional_phase_actions") or []
+    if optional_phase_actions:
+        if not isinstance(optional_phase_actions, list):
+            raise ValueError(f"skill {skill_id} optional_phase_actions must be a list")
+        invalid_optional = [
+            phase_action for phase_action in optional_phase_actions
+            if phase_action not in allowed_phase_actions
+        ]
+        if invalid_optional:
+            raise ValueError(
+                f"skill {skill_id} optional_phase_actions must be in allowed_phase_actions: "
+                f"{invalid_optional}"
+            )
+
     return True
 
 

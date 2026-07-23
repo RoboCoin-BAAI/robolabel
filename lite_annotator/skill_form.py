@@ -107,7 +107,14 @@ class SkillForm(QWidget):
             lines.append(f"结束边界: {skill['end_frame_definition']}")
         allowed_phase_actions = skill.get("allowed_phase_actions") or []
         if allowed_phase_actions:
-            lines.append(f"允许phase action: {', '.join(allowed_phase_actions)}")
+            optional_phase_actions = set(skill.get("optional_phase_actions") or [])
+            phase_labels = [
+                f"{phase_action}(可选)"
+                if phase_action in optional_phase_actions
+                else phase_action
+                for phase_action in allowed_phase_actions
+            ]
+            lines.append(f"允许phase action: {', '.join(phase_labels)}")
         self.skill_info.setText("\n".join(lines))
 
     def create_slot_editor(self, skill, slot):

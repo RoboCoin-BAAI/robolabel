@@ -64,3 +64,21 @@ def test_phase_dialog_shows_subtask_start_frame_hint():
     labels = [child.text() for child in dialog.findChildren(QLabel)]
     assert any("当前subtask范围: 20:60" in text for text in labels)
     assert any("起始帧: 20" in text for text in labels)
+
+
+def test_phase_dialog_marks_optional_actions():
+    app()
+
+    dialog = PhaseDialog(
+        frame_count=100,
+        current_frame=42,
+        allowed_actions=["align", "grasp"],
+        optional_actions=["align"],
+    )
+
+    labels = [
+        dialog.action_select.itemText(index)
+        for index in range(dialog.action_select.count())
+    ]
+    assert any("align" in label and "可选" in label for label in labels)
+    assert any("grasp" in label and "可选" not in label for label in labels)
